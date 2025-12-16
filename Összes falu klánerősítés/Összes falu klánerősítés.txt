@@ -1,0 +1,310 @@
+//Készítette: Patika30
+
+(async () => {
+    // === KERESENDŐ FIÓK NEVE (OPCIONÁLIS, pontos egyezés, kis/nagybetű nem számít) ===
+    const keresettFioK = window.prompt("Melyik fiók erősítéseit listázzuk? (Üres = mindenki)", "");
+    function normalizeName(name) {
+        return (name || "").toLowerCase().trim();
+    }
+    const keresettFioKNorm = normalizeName(keresettFioK);
+
+    // === BOTVÉDELEM INTEGRÁLT MODUL ===
+    const TW_DECODER = new DOMParser();
+    let twBotModal = null,
+        twBotOverlay = null,
+        twBotResume = null,
+        twBotWaiting = false;
+
+    function twCheckBotProtection(source = document) {
+        const toDoc = (src) => typeof src === "string" ?
+            TW_DECODER.parseFromString(src, "text/html") :
+            src && (src.ownerDocument ? src.ownerDocument : src);
+        const doc = toDoc(source);
+        if (!doc) return {
+            detected: false,
+            matchedSel: [],
+            matchedText: []
+        };
+
+        const selectors = [
+            '#bot_check', '#popup_box_bot_protection', '#botprotection_quest', '#bot_protection',
+            'form#bot_protection', '.bot_protection', '[id*="bot_protect"]', '[class*="bot_protect"]',
+            'img[id*="captcha"]', 'canvas[id*="captcha"]'
+        ];
+        const matchedSel = selectors.filter(sel => {
+            try {
+                return !!doc.querySelector(sel);
+            } catch {
+                return false;
+            }
+        });
+
+        const text = (doc.body?.innerText || "").toLowerCase();
+        const textHints = [
+            'bot védelem', 'botvédelem', 'bot protection', 'captcha',
+            'biztonsági ellenőrzés', 'ellenőrzés', 'nem vagyok robot',
+            'igazold hogy nem vagy robot'
+        ];
+        const matchedText = textHints.filter(t => text.includes(t));
+
+        const detected = matchedSel.length > 0 || matchedText.length > 0;
+        return {
+            detected,
+            matchedSel,
+            matchedText
+        };
+    }
+
+    function twEscapeHtml(s) {
+        return String(s || "").replace(/[&<>"']/g, c => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": "''"
+        }[c]));
+    }
+
+    function twShowBotModal(info) {
+        if (!twBotModal || !twBotOverlay) {
+            twBotOverlay = document.createElement("div");
+            twBotOverlay.style.position = "fixed";
+            twBotOverlay.style.inset = "0";
+            twBotOverlay.style.background = "rgba(0,0,0,0.6)";
+            twBotOverlay.style.zIndex = "999999";
+            twBotOverlay.style.display = "none";
+
+            twBotModal = document.createElement("div");
+            twBotModal.style.position = "fixed";
+            twBotModal.style.left = "50%";
+            twBotModal.style.top = "50%";
+            twBotModal.style.transform = "translate(-50%, -50%)";
+            twBotModal.style.minWidth = "420px";
+            twBotModal.style.maxWidth = "90vw";
+            twBotModal.style.background = "#111";
+            twBotModal.style.color = "#eee";
+            twBotModal.style.border = "1px solid #444";
+            twBotModal.style.borderRadius = "12px";
+            twBotModal.style.boxShadow = "0 10px 30px rgba(0,0,0,0.5)";
+            twBotModal.style.padding = "18px 16px";
+            twBotModal.style.fontFamily = "system-ui, sans-serif";
+
+            twBotOverlay.appendChild(twBotModal);
+            document.body.appendChild(twBotOverlay);
+        }
+
+        twBotModal.innerHTML = `
+          <div style="font-size:18px; font-weight:700; margin-bottom:8px;">🛑 Botvédelem észlelve</div>
+          <div style="opacity:.9; line-height:1.5; margin-bottom:12px;">
+            A bot leállt, amíg meg nem oldod a botvédelmet a játékban.<br>
+            Miután kész vagy, kattints az <b>OK, folytatás</b> gombra.
+          </div>
+          <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
+            <button id="twbot-stop" style="padding:8px 12px; background:#333; color:#eee; border:1px solid #555; border-radius:8px; cursor:pointer;">Stop</button>
+            <button id="twbot-ok" style="padding:8px 12px; background:#2e7d32; color:#fff; border:1px solid #1b5e20; border-radius:8px; cursor:pointer; font-weight:600;">OK, folytatás</button>
+          </div>
+        `;
+        twBotOverlay.style.display = "block";
+
+        twBotModal.querySelector("#twbot-ok").onclick = () => {
+            twBotOverlay.style.display = "none";
+            if (twBotResume) {
+                twBotResume();
+                twBotResume = null;
+            }
+            twBotWaiting = false;
+        };
+        twBotModal.querySelector("#twbot-stop").onclick = () => {
+            twBotOverlay.style.display = "none";
+            twBotWaiting = false;
+            throw new Error('A botot manuálisan leállítottad.');
+        };
+    }
+
+    async function twWaitUserConfirm(info) {
+        twBotWaiting = true;
+        twShowBotModal(info);
+        await new Promise(res => {
+            twBotResume = res;
+        });
+    }
+
+    // === TÁMOGATÁS-LISTÁZÓ KÓD + BOTVÉDELEM + SAJÁT FALU ÉRŐSÍTÉS INTEGRÁCIÓ ===
+
+    const unitNames = [
+        "Lándzsás", "Kardforgató", "Bárdos", "Íjász",
+        "Kém", "Könnyűlovas", "Lovas íjász", "Nehézlovas",
+        "Faltörő kos", "Katapult", "Lovag", "Főnemes", "Milícia"
+    ];
+
+    // Saját név megszerzése
+    const sajatNev = (typeof game_data === 'object') ? game_data.player.name : "Saját fiók";
+
+    const resp = await fetch('https://hu97.klanhaboru.hu/map/village.txt');
+    const text = await resp.text();
+    const villages = text.trim().split('\n').map(row => {
+        const cols = row.split(',');
+        if (cols.length < 4 || !cols[0] || !cols[1] || !cols[2] || !cols[3]) return null;
+        return {
+            id: cols[0],
+            name: decodeURIComponent(cols[1].replace(/\+/g, ' ')),
+            x: cols[2],
+            y: cols[3]
+        };
+    }).filter(Boolean);
+
+    let modal = document.getElementById('tw_erosites_modal');
+    if (modal) modal.remove();
+    let overlay = document.getElementById('tw_erosites_overlay');
+    if (overlay) overlay.remove();
+
+    overlay = document.createElement('div');
+    overlay.id = 'tw_erosites_overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = 0;
+    overlay.style.left = 0;
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.background = 'rgba(0,0,0,0.27)';
+    overlay.style.zIndex = '2147483646';
+    overlay.onclick = () => {
+        modal.remove();
+        overlay.remove();
+    };
+
+    modal = document.createElement('div');
+    modal.id = 'tw_erosites_modal';
+    modal.style.position = 'fixed';
+    modal.style.top = '40px';
+    modal.style.left = '50%';
+    modal.style.transform = 'translateX(-50%)';
+    modal.style.background = '#fffaf0';
+    modal.style.border = '2px solid #444';
+    modal.style.padding = '24px 20px 32px 20px';
+    modal.style.borderRadius = '12px';
+    modal.style.zIndex = '2147483647';
+    modal.style.maxHeight = '80vh';
+    modal.style.overflowY = 'auto';
+    modal.style.width = '95vw';
+    modal.style.maxWidth = '1100px';
+    modal.style.boxShadow = '0 0 18px #00000020';
+    modal.innerHTML = `
+    <button id="tw_erosites_close" style="float:right; margin-bottom:10px;font-weight:bold;padding:8px 20px;background:#ffe38a;border:1px solid #ab7a28;border-radius:6px;">Bezárás</button>
+    <h2 style="text-align:center; margin-top:0; margin-bottom:16px; color:#7a5300; font-weight:bold; font-size:22px;">Teljes világ erősítések (${villages.length} falu, minden támogatás)</h2>
+    <div style="font-size:13px;color:#555;text-align:center;margin-bottom:4px;">
+        Szűrés fiókra: <b>${keresettFioKNorm ? keresettFioK : "nincs, minden játékos látszik"}</b>
+    </div>
+    <div id="tw_erosites_progress" style="font-size:14px;color:#333;text-align:center;margin-bottom:12px;">Indítás...</div>
+    <div id="tw_erosites_accordion"></div>
+    <div style="
+        position:absolute;
+        right:18px;
+        bottom:10px;
+        font-size:12px;
+        opacity:0.5;
+        pointer-events:none;
+        color:#7a5300;
+        z-index:10;
+    ">
+        Készítette: Patika30
+    </div>
+    `;
+    document.body.appendChild(overlay);
+    document.body.appendChild(modal);
+    document.getElementById('tw_erosites_close').onclick = () => {
+        modal.remove();
+        overlay.remove();
+    };
+    const accordion = modal.querySelector('#tw_erosites_accordion');
+    const progress = modal.querySelector('#tw_erosites_progress');
+
+    let found = 0,
+        done = 0;
+    for (const v of villages) {
+        const url = `/game.php?village=${game_data.village.id}&screen=info_village&id=${v.id}`;
+        try {
+            const resp = await fetch(url);
+            const html = await resp.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+
+            // Botvédelem ellenőrzése
+            const bp = twCheckBotProtection(doc);
+            if (bp.detected) await twWaitUserConfirm(bp);
+
+            const coords = `${v.x}|${v.y}`;
+            const rows = doc.querySelectorAll('tr[class^="village_row_"]');
+            let playerUnits = {};
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 2) return;
+                const links = cells[0].querySelectorAll('a');
+
+                let player = (links.length < 2 || !links[1].textContent.trim())
+                    ? sajatNev
+                    : links[1].textContent.trim();
+
+                // Teljes, pontos név egyezés szűrés (kis/nagybetű nem számít)
+                if (keresettFioKNorm && normalizeName(player) !== keresettFioKNorm) {
+                    return;
+                }
+
+                const unitsRaw = Array.from(cells).slice(1, unitNames.length + 1).map(
+                    td => parseInt(td.textContent.replace(/\s/g, '').trim()) || 0
+                );
+                if (unitsRaw.every(n => n === 0)) return;
+
+                playerUnits[player] = unitsRaw;
+            });
+
+            if (Object.keys(playerUnits).length > 0) {
+                const pane = document.createElement('div');
+                pane.style.margin = '0 0 8px 0';
+                pane.style.border = '1px solid #e1c979';
+                pane.style.borderRadius = '7px';
+                pane.style.background = '#fffbeb';
+                const header = document.createElement('div');
+                header.style.cursor = 'pointer';
+                header.style.padding = '10px 12px';
+                header.style.background = '#edd087';
+                header.style.fontWeight = 'bold';
+                header.style.display = 'flex';
+                header.style.alignItems = 'center';
+                header.innerHTML = `<span style="font-size:18px; margin-right:10px;">▶</span>
+                    ${v.name} <span style="color:#665c28; margin-left:12px; font-size:14px;">(${coords})</span>`;
+                pane.appendChild(header);
+
+                const content = document.createElement('div');
+                content.style.display = 'none';
+                content.style.padding = '12px 12px 10px 28px';
+                content.style.background = '#fffce2';
+
+                let innerHtml = '';
+                Object.entries(playerUnits).forEach(([player, units]) => {
+                    innerHtml += `<div style="margin-bottom:6px;">
+                        <b>${player}</b>: ${units.map((n, i) => n > 0 ? `<span style="margin-right:10px;">${unitNames[i]}: <b>${n}</b></span>` : '').join(' ')}
+                    </div>`;
+                });
+                content.innerHTML = innerHtml;
+                pane.appendChild(content);
+
+                header.onclick = function() {
+                    if (content.style.display === 'none') {
+                        content.style.display = 'block';
+                        header.querySelector('span').innerHTML = '▼';
+                    } else {
+                        content.style.display = 'none';
+                        header.querySelector('span').innerHTML = '▶';
+                    }
+                };
+                accordion.appendChild(pane);
+                found++;
+            }
+            done++;
+            progress.textContent = `Feldolgozva: ${done} / ${villages.length} falu; Támogatásokkal: ${found} db`;
+            await new Promise(r => setTimeout(r, 350));
+        } catch (err) {
+            progress.textContent = `Hiba a feldolgozásban: ${v.name} (${v.x}|${v.y})`;
+        }
+    }
+    progress.textContent = `✅ Kész! Támogatással rendelkező falvak: ${found} db látható.`;
+})();
