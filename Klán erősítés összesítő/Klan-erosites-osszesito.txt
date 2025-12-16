@@ -1,0 +1,142 @@
+//Készítő: Patika30
+
+(async () => {
+    const unitNames = [
+        'Lándzsás', 'Kardforgató', 'Bárdos', 'Íjász',
+        'Kém', 'Könnyűlovas', 'Lovas íjász', 'Nehézlovas',
+        'Faltörő kos', 'Katapult', 'Lovag', 'Főnemes'
+        // 'Milícia' eltávolítva
+    ];
+
+    const sajatNev = (typeof game_data === 'object' && game_data.player && game_data.player.name) ?
+        game_data.player.name.trim() :
+        'Saját fiók';
+
+    const rows = document.querySelectorAll('tr[class^="village_row_"]');
+    let playerTotals = {};
+
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length < 2) return;
+
+        const links = cells[0].querySelectorAll('a');
+        let playerText = (links.length < 2 || !links[1].textContent.trim()) ? sajatNev : links[1].textContent.trim();
+
+        const parenStart = playerText.indexOf('(');
+        const parenEnd = playerText.indexOf(')');
+        let player = '';
+        if (parenStart !== -1 && parenEnd !== -1 && parenEnd > parenStart) {
+            player = playerText.substring(parenStart + 1, parenEnd).trim();
+        } else {
+            player = playerText;
+        }
+
+        if (!player) return;
+
+        const unitsRaw = Array.from(cells).slice(1, unitNames.length + 1).map(td => parseInt(td.textContent.trim()) || 0);
+        if (unitsRaw.every(n => n === 0)) return;
+
+        if (!playerTotals[player]) {
+            playerTotals[player] = new Array(unitNames.length).fill(0);
+        }
+        unitsRaw.forEach((num, idx) => {
+            playerTotals[player][idx] += num;
+        });
+    });
+
+    let existingModal = document.getElementById('clanReinforcementsModal');
+    if (existingModal) existingModal.remove();
+    let existingOverlay = document.getElementById('clanReinforcementsOverlay');
+    if (existingOverlay) existingOverlay.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'clanReinforcementsModal';
+    modal.style.position = 'fixed';
+    modal.style.top = '50%';
+    modal.style.left = '50%';
+    modal.style.transform = 'translate(-50%, -50%)';
+    modal.style.backgroundColor = '#edd3a1';
+    modal.style.border = '2px solid #444';
+    modal.style.padding = '20px';
+    modal.style.zIndex = 10000;
+    modal.style.maxHeight = '80vh';
+    modal.style.overflowY = 'auto';
+    modal.style.width = '90vw';
+    modal.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+
+    let html = `<h2 style="margin-top:0">Klán Erősítés Összesítő</h2>`;
+    html += `<button id="closeReinforcementsModal" style="float:right; margin-bottom:10px;">Bezárás</button>`;
+    html += `<table style="border-collapse: collapse; width: 100%;">`;
+    html += `<thead><tr><th style="border: 2px solid #fff; padding:5px; text-align:center;">Fiók</th>`;
+    unitNames.forEach(name => {
+        html += `<th style="border: 2px solid #fff; padding:5px; text-align:center;">${name}</th>`;
+    });
+    html += `</tr></thead><tbody>`;
+
+    // Játékosok sorai
+    for (const player in playerTotals) {
+        html += `<tr><td style="border: 2px solid #fff; padding:5px; font-weight:bold; text-align:center;">${player}</td>`;
+        playerTotals[player].forEach(num => {
+            html += `<td style="border: 2px solid #fff; padding:5px; text-align:center;">${num > 0 ? num : ''}</td>`;
+        });
+        html += `</tr>`;
+    }
+
+    // Összesítő sor hozzáadása
+    const totalUnits = new Array(unitNames.length).fill(0);
+    for (const player in playerTotals) {
+        playerTotals[player].forEach((num, idx) => {
+            totalUnits[idx] += num;
+        });
+    }
+    html += `<tr style="font-weight:bold; background-color:#f0e6c8;"><td style="border: 2px solid #fff; padding:5px; text-align:center;">Összesen</td>`;
+    totalUnits.forEach(num => {
+        html += `<td style="border: 2px solid #fff; padding:5px; text-align:center;">${num > 0 ? num : ''}</td>`;
+    });
+    html += `</tr>`;
+
+    html += `</tbody></table>`;
+
+    // Szerzői felirat
+    html += `<div style="
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-end;
+        margin-top: 8px;
+    ">
+        <span style="
+            font-size: 13px;
+            color: #000000;
+            opacity: 0.85;
+            font-style: italic;
+            text-align: right;">
+            Készítette: Patika30
+        </span>
+    </div>`;
+
+    modal.innerHTML = html;
+
+    modal.querySelector('#closeReinforcementsModal').onclick = () => {
+        modal.remove();
+        const overlay = document.getElementById('clanReinforcementsOverlay');
+        if (overlay) overlay.remove();
+    };
+
+    const overlay = document.createElement('div');
+    overlay.id = 'clanReinforcementsOverlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = 0;
+    overlay.style.left = 0;
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.backgroundColor = 'rgba(0,0,0,0.3)';
+    overlay.style.zIndex = 9999;
+    overlay.onclick = () => {
+        modal.remove();
+        overlay.remove();
+    };
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(modal);
+})();

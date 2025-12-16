@@ -1,0 +1,228 @@
+//Készítő: Patika30
+
+(function() {
+    // Duplikáció elleni védelem
+    if (document.getElementById('color_picker_box')) return;
+
+    var container = document.getElementById('color_picker');
+    if (!container) {
+        alert('Nem találom a színválasztó táblázatot!');
+        return;
+    }
+    var rInput = document.getElementById('color_picker_r');
+    var gInput = document.getElementById('color_picker_g');
+    var bInput = document.getElementById('color_picker_b');
+    var colorTd = document.getElementById('color');
+    if (!rInput || !gInput || !bInput || !colorTd) {
+        alert('Valamelyik (r,g,b) input vagy színminta nem található!');
+        return;
+    }
+    rInput.style.display = 'none';
+    gInput.style.display = 'none';
+    bInput.style.display = 'none';
+
+    const pickerBox = document.createElement('div');
+    pickerBox.id = 'color_picker_box';
+    pickerBox.style.background = "#222";
+    pickerBox.style.borderRadius = "8px";
+    pickerBox.style.boxShadow = "0 2px 12px #0008";
+    pickerBox.style.margin = "0 auto 12px auto";
+    pickerBox.style.padding = "18px 0 12px 0";
+    pickerBox.style.textAlign = "center";
+    pickerBox.style.width = "95%";
+    pickerBox.style.maxWidth = "255px";
+
+    const pickerCanvas = document.createElement('canvas');
+    pickerCanvas.width = 200;
+    pickerCanvas.height = 140;
+    pickerCanvas.style.cursor = 'crosshair';
+    pickerCanvas.style.display = 'block';
+    pickerCanvas.style.margin = "0px auto 8px auto";
+    pickerCanvas.style.borderRadius = "7px";
+    pickerBox.appendChild(pickerCanvas);
+
+    const sliderGradient = document.createElement('canvas');
+    sliderGradient.width = 130;
+    sliderGradient.height = 16;
+    sliderGradient.style.display = "block";
+    sliderGradient.style.margin = "3px auto -13px auto";
+    sliderGradient.style.borderRadius = "7px";
+    sliderGradient.style.pointerEvents = "none";
+    pickerBox.appendChild(sliderGradient);
+
+    const hueSlider = document.createElement('input');
+    hueSlider.type = 'range';
+    hueSlider.min = '0';
+    hueSlider.max = '360';
+    hueSlider.value = '300';
+    hueSlider.style.width = sliderGradient.width + 'px';
+    hueSlider.style.margin = "0 auto 0 auto";
+    hueSlider.style.display = "block";
+    pickerBox.appendChild(hueSlider);
+
+    const hexInput = document.createElement('input');
+    hexInput.type = 'text';
+    hexInput.value = '#f47fff';
+    hexInput.style.width = '84px';
+    hexInput.style.margin = "0 9px";
+    hexInput.style.padding = '4px 6px';
+    hexInput.style.borderRadius = '3px';
+    hexInput.style.border = '1px solid #888';
+    hexInput.style.display = "inline-block";
+    pickerBox.appendChild(hexInput);
+
+    const preview = document.createElement('div');
+    preview.style.display = 'inline-block';
+    preview.style.width = '28px';
+    preview.style.height = '28px';
+    preview.style.marginLeft = '8px';
+    preview.style.marginRight = '8px';
+    preview.style.borderRadius = '7px';
+    preview.style.boxShadow = '0 1px 4px #0006';
+    preview.style.background = '#f47fff';
+    pickerBox.appendChild(preview);
+
+    container.parentNode.insertBefore(pickerBox, container);
+
+    const ctx = pickerCanvas.getContext('2d');
+    let hue = parseInt(hueSlider.value);
+    let color = {
+        r: parseInt(rInput.value) || 247,
+        g: parseInt(gInput.value) || 127,
+        b: parseInt(bInput.value) || 255
+    };
+
+    function drawPicker(hue) {
+        const w = pickerCanvas.width;
+        const h = pickerCanvas.height;
+        const imgData = ctx.createImageData(w, h);
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const s = x / w;
+                const v = 1 - (y / h);
+                const rgb = hsvToRgb(hue / 360, s, v);
+                const idx = (y * w + x) * 4;
+                imgData.data[idx] = rgb.r;
+                imgData.data[idx + 1] = rgb.g;
+                imgData.data[idx + 2] = rgb.b;
+                imgData.data[idx + 3] = 255;
+            }
+        }
+        ctx.putImageData(imgData, 0, 0);
+    }
+
+    function drawSliderGradient() {
+        const gradCtx = sliderGradient.getContext('2d');
+        const w = sliderGradient.width;
+        for (let x = 0; x < w; x++) {
+            const hh = x / w;
+            const rgb = hsvToRgb(hh, 1, 1);
+            gradCtx.fillStyle = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+            gradCtx.fillRect(x, 0, 1, sliderGradient.height);
+        }
+        gradCtx.strokeStyle = "#444";
+        gradCtx.lineWidth = 1;
+        gradCtx.strokeRect(0, 0, w, sliderGradient.height);
+    }
+
+    function hsvToRgb(h, s, v) {
+        let r, g, b, i, f, p, q, t;
+        i = Math.floor(h * 6);
+        f = h * 6 - i;
+        p = v * (1 - s);
+        q = v * (1 - f * s);
+        t = v * (1 - (1 - f) * s);
+        switch (i % 6) {
+            case 0:
+                r = v, g = t, b = p;
+                break;
+            case 1:
+                r = q, g = v, b = p;
+                break;
+            case 2:
+                r = p, g = v, b = t;
+                break;
+            case 3:
+                r = p, g = q, b = v;
+                break;
+            case 4:
+                r = t, g = p, b = v;
+                break;
+            case 5:
+                r = v, g = p, b = q;
+                break;
+        }
+        return {
+            r: Math.round(r * 255),
+            g: Math.round(g * 255),
+            b: Math.round(b * 255)
+        };
+    }
+
+    function rgbToHex(r, g, b) {
+        return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+
+    function hexToRgb(hex) {
+        hex = hex.replace(/^#/, '');
+        if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
+        const num = parseInt(hex, 16);
+        return {
+            r: (num >> 16) & 255,
+            g: (num >> 8) & 255,
+            b: num & 255
+        };
+    }
+
+    function updatePreview() {
+        preview.style.background = rgbToHex(color.r, color.g, color.b);
+    }
+
+    function updateAll(color) {
+        if (colorTd) {
+            colorTd.style.backgroundColor = 'rgb(' + color.r + ',' + color.g + ',' + color.b + ')';
+            colorTd.style.backgroundImage = 'none';
+        }
+        rInput.value = color.r;
+        gInput.value = color.g;
+        bInput.value = color.b;
+        if (typeof color_picker_change === 'function') {
+            color_picker_change();
+        }
+    }
+
+    pickerCanvas.addEventListener('click', function(e) {
+        const rect = pickerCanvas.getBoundingClientRect();
+        const x = Math.floor((e.clientX - rect.left) / rect.width * pickerCanvas.width);
+        const y = Math.floor((e.clientY - rect.top) / rect.height * pickerCanvas.height);
+        const data = ctx.getImageData(x, y, 1, 1).data;
+        color = {
+            r: data[0],
+            g: data[1],
+            b: data[2]
+        };
+        hexInput.value = rgbToHex(color.r, color.g, color.b);
+        updatePreview();
+        updateAll(color);
+    });
+
+    hueSlider.addEventListener('input', function() {
+        hue = parseInt(this.value);
+        drawPicker(hue);
+    });
+
+    hexInput.addEventListener('input', function() {
+        let rgb = hexToRgb(this.value);
+        if (rgb) {
+            color = rgb;
+            updatePreview();
+            updateAll(color);
+        }
+    });
+
+    drawPicker(hue);
+    drawSliderGradient();
+    hexInput.value = rgbToHex(color.r, color.g, color.b);
+    updatePreview();
+    updateAll(color);
+})();

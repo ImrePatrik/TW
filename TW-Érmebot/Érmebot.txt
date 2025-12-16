@@ -1,0 +1,516 @@
+javascript:(() => {
+  const LOG = "⚙️[Mint+Res]";
+  const DECODER = new DOMParser();
+
+  if (typeof window.woodPercentage === 'undefined') {
+    window.woodPercentage  = 28000 / 83000;
+    window.stonePercentage = 30000 / 83000;
+    window.ironPercentage  = 25000 / 83000;
+  }
+
+  const DEFAULTS = {
+    resFetchMinMin: 60,
+    resFetchMaxMin: 120,
+    keepWhPercent: 0,
+    coinWaitCapMinMin: 1,
+    coinWaitCapMaxMin: 5,
+    enableWaitCap: true,
+    storageSafetySubSec: 20,
+    minFloorSec: 10,
+    autoStartMint: false,
+    autoStartRes: false
+  };
+  const CFG_KEY = "tw_combo_mint_res_cfg_v4";
+  const loadCfg = () => {
+    try { return { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(CFG_KEY)||"{}")) }; }
+    catch { return { ...DEFAULTS }; }
+  };
+  const saveCfg = (cfg) => localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+  let CFG = loadCfg();
+
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const rand  = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+  const nowSec = () => Math.floor(Date.now()/1000);
+  const parseDigits = (str) => { const m=(str||"").match(/\d+/); return m?parseInt(m[0],10):null; };
+  const parseFirstInt = (txt)=>{ const m=String(txt||'').match(/^\s*(\d+)/); return m?parseInt(m[1],10):0; };
+  const parseIntLoose = (txt)=>parseInt(String(txt||'').replace(/[^\d]/g,''),10)||0;
+
+  function fire(el, type) {
+    try { el.dispatchEvent(new Event(type, { bubbles:true })); } catch {}
+    try { el.dispatchEvent(new MouseEvent(type, { bubbles:true, cancelable:true, view:window })); } catch {}
+  }
+
+  let resLimit = 0;
+  try {
+    const v = sessionStorage.getItem('resLimit');
+    if (v!=null && v!=='') resLimit = parseFloat(v);
+  } catch {}
+
+  function getVillageId() {
+    const u = new URL(location.href);
+    const v = u.searchParams.get("village");
+    return v ? String(v) : null;
+  }
+  function buildMarketCallURLExact() {
+    const villageId = getVillageId();
+    if (!villageId) throw new Error("village id nem található az URL-ben");
+    const u = new URL(location.origin + "/game.php");
+    u.searchParams.set("village", villageId);
+    u.searchParams.set("screen", "market");
+    u.searchParams.set("order", "distance");
+    u.searchParams.set("dir", "ASC");
+    u.searchParams.set("target_id", villageId);
+    u.searchParams.set("mode", "call");
+    u.searchParams.set("group", "0");
+    u.searchParams.set("page", "-1");
+    return u.toString();
+  }
+  function buildSnobCoinURL(villageId) {
+    return `/game.php?village=${encodeURIComponent(villageId)}&screen=snob&mode=train`;
+  }
+  function buildStorageURL(villageId) {
+    return `/game.php?village=${encodeURIComponent(villageId)}&screen=storage`;
+  }
+
+  let activeTask = null; // 'mint' | 'res' | null
+  async function withLock(taskName, fn) {
+    if (activeTask) {
+      console.log(LOG, `⛔ ${taskName} kihagyva – aktív: ${activeTask}`);
+      return false;
+    }
+    activeTask = taskName;
+    try {
+      await fn();
+      return true;
+    } finally {
+      activeTask = null;
+    }
+  }
+
+  function checkBotProtection(source=document){
+    const toDoc = (src)=> typeof src==="string" ? DECODER.parseFromString(src,"text/html") : (src?.ownerDocument?src.ownerDocument:src);
+    const doc = toDoc(source); if (!doc) return {detected:false,matchedSel:[],matchedText:[]};
+    const selectors=['#bot_check','#popup_box_bot_protection','#botprotection_quest','#bot_protection','form#bot_protection','.bot_protection','[id*="bot_protect"]','[class*="bot_protect"]','img[id*="captcha"]','canvas[id*="captcha"]'];
+    const matchedSel = selectors.filter(sel=>{ try{return !!doc.querySelector(sel);}catch{return false;} });
+    const text=(doc.body?.innerText||"").toLowerCase();
+    const hints=['bot védelem','botvédelem','bot protection','captcha','biztonsági ellenőrzés','ellenőrzés','nem vagyok robot','igazold hogy nem vagy robot'];
+    const matchedText = hints.filter(h=>text.includes(h));
+    return {detected: matchedSel.length>0 || matchedText.length>0, matchedSel, matchedText};
+  }
+
+  let modalEl=null, overlayEl=null, resumeResolver=null, waitingForUser=false;
+  function ensureModal(){
+    if (overlayEl && modalEl) return;
+    overlayEl=document.createElement("div");
+    Object.assign(overlayEl.style,{position:"fixed",inset:"0",background:"rgba(0,0,0,.6)",zIndex:"999999",display:"none"});
+    modalEl=document.createElement("div");
+    Object.assign(modalEl.style,{position:"fixed",left:"50%",top:"50%",transform:"translate(-50%,-50%)",minWidth:"420px",maxWidth:"90vw",background:"#111",color:"#eee",border:"1px solid #444",borderRadius:"12px",boxShadow:"0 10px 30px rgba(0,0,0,.5)",padding:"18px 16px",fontFamily:"system-ui,sans-serif"});
+    overlayEl.appendChild(modalEl); document.body.appendChild(overlayEl);
+  }
+  function showBotModal(){
+    ensureModal();
+    modalEl.innerHTML=`
+      <div style="font-size:18px;font-weight:700;margin-bottom:8px;">🛑 Botvédelem észlelve</div>
+      <div style="opacity:.9;line-height:1.5;margin-bottom:12px;">Oldd meg a botvédelmet, majd kattints az <b>OK, folytatás</b>-ra.</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+        <button id="mintbot-ok" style="padding:8px 12px;background:#2e7d32;color:#fff;border:1px solid #1b5e20;border-radius:8px;cursor:pointer;font-weight:600;">OK, folytatás</button>
+      </div>`;
+    overlayEl.style.display="block";
+    modalEl.querySelector("#mintbot-ok").onclick=()=>{
+      overlayEl.style.display="none";
+      if (resumeResolver){ resumeResolver(); resumeResolver=null; }
+      waitingForUser=false;
+    };
+  }
+  async function waitUserConfirm(){ waitingForUser=true; showBotModal(); await new Promise(res=>{resumeResolver=res;}); }
+
+  async function fetchPage(url){
+    const res = await fetch(url,{credentials:"same-origin"});
+    if(!res.ok) throw new Error(`${url} GET ${res.status}`);
+    const html = await res.text();
+    const doc  = DECODER.parseFromString(html,"text/html");
+    return {doc, html, url};
+  }
+  async function fetchSnobCoinPage(villageId){ return fetchPage(buildSnobCoinURL(villageId)); }
+  async function fetchStoragePage(villageId){ return fetchPage(buildStorageURL(villageId)); }
+  function extractCsrf({doc, html}){
+    const inputH = doc.querySelector('input[name="h"]'); if(inputH?.value) return inputH.value;
+    const urlH   = (html.match(/[?&]h=([A-Za-z0-9]+)/)||[])[1]; if(urlH) return urlH;
+    const m1     = html.match(/["']csrf["']\s*:\s*["']([A-Za-z0-9]+)["']/); if(m1?.[1]) return m1[1];
+    const m2     = html.match(/game_data[^;]+["']csrf["']\s*:\s*["']([A-Za-z0-9]+)["']/); if(m2?.[1]) return m2[1];
+    return null;
+  }
+  function extractFormAndMax(doc){
+    const form = doc.querySelector('form[action*="screen=snob"][action*="action=coin"]')
+              || doc.querySelector('form[action*="action=coin"]')
+              || doc.querySelector('form[action*="screen=snob"]')
+              || doc.querySelector("form");
+    const actionUrl = form?.action || null;
+    const maxText   = doc.querySelector("#coin_mint_fill_max")?.textContent || "";
+    const maxCoins  = parseDigits(maxText);
+    return { actionUrl, maxCoins };
+  }
+  async function postMint(actionUrl, count, h, villageId){
+    const url = actionUrl || `/game.php?village=${encodeURIComponent(villageId)}&screen=snob&action=coin`;
+    const body = new URLSearchParams(); body.set("count", String(count)); body.set("h", h);
+    const res = await fetch(url,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});
+    if(!res.ok) throw new Error(`coin POST ${res.status}`);
+    const html = await res.text();
+    const ok = /(Siker|Sikeres|érme|coin|Veretés|Verettél)/i.test(html);
+    return { ok, html };
+  }
+
+  const DAILY_KEY = "ermegyujto_total";
+  const RESET_KEY = "ermegyujto_reset_at";
+  function resetDailyCounterIfNeeded() {
+    const now=Date.now(), last=Number(localStorage.getItem(RESET_KEY)||0);
+    if (!last || (now-last)>86400000) {
+      localStorage.setItem(DAILY_KEY,"0");
+      localStorage.setItem(RESET_KEY,String(now));
+      console.log("🪙[MintBot] napi számláló reset");
+    }
+  }
+  function addToDailyTotal(n){
+    const cur=Number(localStorage.getItem(DAILY_KEY)||0);
+    const next=cur+(Number(n)||0);
+    localStorage.setItem(DAILY_KEY,String(next));
+    updateCoinBadge();
+    return next;
+  }
+  function getDailyTotal(){
+    return Number(localStorage.getItem(DAILY_KEY)||0);
+  }
+
+  const FALLBACK_MIN_MS = 30_000, FALLBACK_MAX_MS = 60_000;
+  let ENABLE_WAIT_CAP = !!CFG.enableWaitCap;
+  let STORAGE_SAFETY_SUB_MS = Math.max(0, (CFG.storageSafetySubSec|0) * 1000);
+  let MIN_FLOOR_MS = Math.max(1000, (CFG.minFloorSec|0) * 1000);
+  function applyWaitCap(ms) {
+    if (!ENABLE_WAIT_CAP) return ms;
+    const minCap = Math.max(1, CFG.coinWaitCapMinMin|0) * 60_000;
+    const maxCap = Math.max(minCap, (CFG.coinWaitCapMaxMin|0) * 60_000);
+    const cap = rand(minCap, maxCap);
+    if (ms > cap) {
+      console.log("🪙[MintBot]", `⏱️ cap: ${Math.round(ms/1000)}s ⇒ ${Math.round(cap/1000)}s`);
+      return cap;
+    }
+    return ms;
+  }
+
+  async function computeNextWaitMs(villageId){
+    try{
+      const page = await fetchStoragePage(villageId);
+      if (checkBotProtection(page.doc).detected) {
+        await waitUserConfirm();
+        return applyWaitCap(rand(FALLBACK_MIN_MS, FALLBACK_MAX_MS));
+      }
+      const spans=[...page.doc.querySelectorAll('span[data-endtime]')];
+      if(!spans.length) return applyWaitCap(rand(FALLBACK_MIN_MS, FALLBACK_MAX_MS));
+      const deltas = spans.map(s=>Number(s.getAttribute('data-endtime'))).filter(Number.isFinite).map(end=>(end-nowSec())*1000).filter(ms=>ms>0);
+      if(!deltas.length) return applyWaitCap(rand(FALLBACK_MIN_MS, FALLBACK_MAX_MS));
+      const minMs = Math.min(...deltas);
+      let waitMs = Math.max(minMs - STORAGE_SAFETY_SUB_MS, MIN_FLOOR_MS);
+      waitMs += rand(-1000,1000);
+      return applyWaitCap(waitMs);
+    }catch{
+      return applyWaitCap(rand(FALLBACK_MIN_MS, FALLBACK_MAX_MS));
+    }
+  }
+  async function runOnceMint(){
+    return withLock('mint', async () => {
+      resetDailyCounterIfNeeded();
+      if (checkBotProtection(document).detected) await waitUserConfirm();
+      const villageId = getVillageId(); if(!villageId) throw new Error("village id hiányzik");
+      const page = await fetchSnobCoinPage(villageId);
+      if (checkBotProtection(page.doc).detected) await waitUserConfirm();
+      const h = extractCsrf(page); if(!h) return;
+      const {actionUrl, maxCoins} = extractFormAndMax(page.doc);
+      if(!Number.isFinite(maxCoins)||maxCoins<1) return;
+      await sleep(200+rand(0,400));
+      const {ok} = await postMint(actionUrl,maxCoins,h,villageId);
+      const total = addToDailyTotal(maxCoins);
+      console.log("🪙[MintBot]", `🟩 Veretés: ${maxCoins} | Napi: ${total}${ok?" ✔︎":""}`);
+    });
+  }
+  let mintRunning=false;
+  async function mintLoop(){
+    while(mintRunning){
+      try{ await runOnceMint(); }catch(e){ console.error("🪙[MintBot]", e); }
+      try{
+        const villageId = getVillageId();
+        let waitMs = villageId ? await computeNextWaitMs(villageId) : rand(FALLBACK_MIN_MS, FALLBACK_MAX_MS);
+        waitMs = applyWaitCap(waitMs);
+        console.log("🪙[MintBot]", `⏳ Kövi futás ~${Math.round(waitMs/1000)} mp`);
+        await sleep(waitMs);
+      }catch{
+        await sleep(applyWaitCap(rand(FALLBACK_MIN_MS,FALLBACK_MAX_MS)));
+      }
+    }
+  }
+  const coinMintBot = {
+    start(){ if(mintRunning) return;
+      mintRunning=true; ENABLE_WAIT_CAP=!!CFG.enableWaitCap;
+      STORAGE_SAFETY_SUB_MS=Math.max(0,(CFG.storageSafetySubSec|0)*1000);
+      MIN_FLOOR_MS=Math.max(1000,(CFG.minFloorSec|0)*1000);
+      mintLoop(); updateGuiStates(); console.log("🪙[MintBot] indul…");
+    },
+    stop(){ mintRunning=false; updateGuiStates(); console.log("🪙[MintBot] stop"); },
+    status(){ return { total:getDailyTotal(), waitingForUser, running: mintRunning, lockedBy: activeTask }; },
+    resume(){ if(resumeResolver){ resumeResolver(); resumeResolver=null; waitingForUser=false; } }
+  };
+  window.coinMintBot = coinMintBot;
+
+  function calcCoinLogicSend(woodAvail, stoneAvail, ironAvail, whCapacity, availableTraders){
+    const merchantCarry=(availableTraders||0)*1000;
+    if(merchantCarry<=0) return {wood:0,stone:0,iron:0};
+    const keepPercent = Number.isFinite(CFG.keepWhPercent)?CFG.keepWhPercent:0;
+    const leaveBehind=Math.floor((whCapacity||0)*((keepPercent)/100));
+    let localW=Math.max(0,(woodAvail||0)-leaveBehind);
+    let localS=Math.max(0,(stoneAvail||0)-leaveBehind);
+    let localI=Math.max(0,(ironAvail||0)-leaveBehind);
+    let mW=merchantCarry*window.woodPercentage, mS=merchantCarry*window.stonePercentage, mI=merchantCarry*window.ironPercentage;
+    const scale=(need,have,w,s,i)=> need<=have?[w,s,i]:[(w*(have/Math.max(need,1))),(s*(have/Math.max(need,1))),(i*(have/Math.max(need,1)))]
+    ;[mW,mS,mI]=scale(mW,localW,mW,mS,mI);
+    ;[mW,mS,mI]=scale(mS,localS,mW,mS,mI);
+    ;[mW,mS,mI]=scale(mI,localI,mW,mS,mI);
+    return { wood:Math.floor(mW), stone:Math.floor(mS), iron:Math.floor(mI) };
+  }
+
+  async function forceSelectAllOnDoc(doc){
+    const sel = doc.querySelector('input[name="select-all"].select-all');
+    if (sel && !sel.checked) {
+      for (let i=0;i<5 && !sel.checked;i++){
+        sel.click();
+        fire(sel, 'change'); fire(sel, 'input'); fire(sel, 'keyup');
+        await sleep(150);
+      }
+      if (!sel.checked) {
+        const th = sel.closest('th,td') || sel.parentElement;
+        if (th) { th.click(); fire(sel,'change'); }
+      }
+    }
+    const rows=[...doc.querySelectorAll('tr.supply_location')];
+    for(const row of rows){
+      const inputs=row.querySelectorAll('input[type="text"][name^="resource["]');
+      inputs.forEach(inp=>{ inp.classList.remove('hide_toggle'); inp.removeAttribute('disabled'); });
+    }
+  }
+
+  async function runResCallFillOnTab(tabWin){
+    const doc = tabWin.document;
+
+    const t0 = Date.now();
+    while (doc.readyState!=='complete' && Date.now()-t0<8000) await sleep(50);
+    const t1 = Date.now();
+    while (!doc.querySelector('tr.supply_location') && Date.now()-t1<8000) await sleep(100);
+
+    await forceSelectAllOnDoc(doc);
+
+    let totalSendSum = 0;
+    const rows=[...doc.querySelectorAll('tr.supply_location')];
+    for (const row of rows){
+      try{
+        const villageId=row.getAttribute('data-village');
+        const tdWood=row.querySelector('td.wood');
+        const tdStone=row.querySelector('td.stone');
+        const tdIron=row.querySelector('td.iron');
+        const tdTraders=row.querySelector('td.traders');
+        const tdWH=row.querySelector('td:nth-child(6)');
+        if(!villageId||!tdWood||!tdStone||!tdIron||!tdTraders||!tdWH) continue;
+
+        const availW=parseInt(tdWood.getAttribute('data-res')||'0',10);
+        const availS=parseInt(tdStone.getAttribute('data-res')||'0',10);
+        const availI=parseInt(tdIron.getAttribute('data-res')||'0',10);
+        const availableTraders=parseFirstInt(tdTraders.textContent||'');
+        const whCapacity=parseIntLoose(tdWH.textContent||'0');
+
+        const send=calcCoinLogicSend(availW,availS,availI,whCapacity,availableTraders);
+
+        const inpW=row.querySelector(`input[name="resource[${villageId}][wood]"]`);
+        const inpS=row.querySelector(`input[name="resource[${villageId}][stone]"]`);
+        const inpI=row.querySelector(`input[name="resource[${villageId}][iron]"]`);
+        [inpW,inpS,inpI].forEach(inp=>{ if(!inp) return; inp.classList.remove('hide_toggle'); inp.removeAttribute('disabled'); });
+
+        if (inpW) inpW.value = send.wood;
+        if (inpS) inpS.value = send.stone;
+        if (inpI) inpI.value = send.iron;
+
+        totalSendSum += (send.wood||0) + (send.stone||0) + (send.iron||0);
+      }catch(e){ console.warn(LOG,"row fill error",e); }
+    }
+
+    if (totalSendSum > 0) {
+      const submitBtn = doc.querySelector('input.btn[type="submit"][value="Nyersanyagok kérése"]')
+                      || doc.querySelector('input[type="submit"][value="Nyersanyagok kérése"]');
+      if (submitBtn) {
+        submitBtn.click();
+        await sleep(rand(3000, 5000));
+      }
+    }
+
+    try { tabWin.close(); } catch {}
+  }
+
+  let callTab=null;
+  async function ensureCallTab(openFresh=false){
+    const url=buildMarketCallURLExact();
+    const waitForLoad = async (w) => {
+      const t0 = Date.now();
+      while (Date.now() - t0 < 10000) {
+        if (w && w.document && w.document.readyState === 'complete') return true;
+        await sleep(100);
+      }
+      return false;
+    };
+    try{
+      if(!callTab || callTab.closed || openFresh){
+        callTab=window.open(url,"_blank");
+        await waitForLoad(callTab);
+      }else{
+        if(callTab.location.href!==url) callTab.location.href=url;
+        callTab.focus();
+        await waitForLoad(callTab);
+      }
+      return callTab;
+    }catch(e){ console.error(LOG,"Call tab open error:",e); return null; }
+  }
+
+  let resLoopRunning=false;
+  async function runOnceRes(){
+    return withLock('res', async () => {
+      const tab = await ensureCallTab(false);
+      if(!tab) return;
+      await sleep(400);
+      await runResCallFillOnTab(tab);
+      console.log(LOG,"Res call kitöltés + submit kész.");
+    });
+  }
+  async function resLoopCycle(){
+    if(!resLoopRunning) return;
+    try{ await runOnceRes(); }catch(e){ console.error(LOG,e); }
+    if(!resLoopRunning) return;
+    let minMin = Math.max(30, Number(CFG.resFetchMinMin)||30);
+    let maxMin = Math.max(minMin, Number(CFG.resFetchMaxMin)||minMin);
+    const waitMs = rand(minMin*60000, maxMin*60000);
+    console.log(LOG, `⏳ Kövi nyersi bekérés ~${Math.round(waitMs/60000)} perc`);
+    setTimeout(resLoopCycle, waitMs);
+  }
+  function startResLoop(){ if(resLoopRunning) return; resLoopRunning=true; resLoopCycle(); updateGuiStates(); }
+  function stopResLoop(){ resLoopRunning=false; updateGuiStates(); }
+
+  let guiBox=null, coinBadge=null;
+  function makeGui(){
+    if (guiBox) return;
+    guiBox=document.createElement("div");
+    Object.assign(guiBox.style,{
+      position:"fixed", right:"16px", bottom:"16px", zIndex:999999,
+      background:"rgba(17,17,17,.96)", color:"#eee", padding:"12px",
+      border:"1px solid #444", borderRadius:"12px", fontFamily:"system-ui,sans-serif",
+      width:"360px", boxShadow:"0 6px 20px rgba(0,0,0,.4)"
+    });
+    guiBox.id="tw-combo-gui";
+    guiBox.innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-weight:700;">⚙️ Mint + Res Call</div>
+        <div id="coin-badge" style="font-size:12px;background:#1b5e20;color:#fff;padding:4px 8px;border-radius:999px;border:1px solid #0f3a13;min-width:90px;text-align:center;">🪙 0</div>
+      </div>
+
+      <div style="font-weight:600;margin-top:4px;">Nyersi bekérés</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:center;margin-bottom:6px;">
+        <label>Min (perc, ≥30)</label>
+        <input id="cfg-res-min" type="number" min="30" style="width:100%;padding:4px;">
+        <label>Max (perc)</label>
+        <input id="cfg-res-max" type="number" min="30" style="width:100%;padding:4px;">
+        <label>WH-ban hagyandó %</label>
+        <input id="cfg-wh" type="number" min="0" max="100" style="width:100%;padding:4px;">
+      </div>
+
+      <div style="font-weight:600;margin-top:4px;">Coin bot</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:center;">
+        <label>Cap min (perc)</label>
+        <input id="cfg-capmin" type="number" min="1" style="width:100%;padding:4px;">
+        <label>Cap max (perc)</label>
+        <input id="cfg-capmax" type="number" min="1" style="width:100%;padding:4px;">
+        <label>Cap engedélyezve</label>
+        <input id="cfg-cap-enable" type="checkbox">
+        <label>Safety levonás (mp)</label>
+        <input id="cfg-storage-safety" type="number" min="0" style="width:100%;padding:4px;">
+        <label>Min floor (mp)</label>
+        <input id="cfg-min-floor" type="number" min="1" style="width:100%;padding:4px;">
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+        <button id="btn-res-toggle"  style="flex:1;padding:8px;border:1px solid #124;border-radius:8px;background:#235;color:#fff;">Res: START</button>
+        <button id="btn-mint-toggle" style="flex:1;padding:8px;border:1px solid #1b5e20;border-radius:8px;background:#2e7d32;color:#fff;">Mint: START</button>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+        <button id="btn-save" style="padding:6px 10px;">Mentés</button>
+      </div>
+    `;
+    document.body.appendChild(guiBox);
+
+    coinBadge = guiBox.querySelector("#coin-badge");
+
+    const $=(sel)=>guiBox.querySelector(sel);
+    $("#cfg-res-min").value=CFG.resFetchMinMin;
+    $("#cfg-res-max").value=CFG.resFetchMaxMin;
+    $("#cfg-wh").value=CFG.keepWhPercent;
+    $("#cfg-capmin").value=CFG.coinWaitCapMinMin;
+    $("#cfg-capmax").value=CFG.coinWaitCapMaxMin;
+    $("#cfg-cap-enable").checked=!!CFG.enableWaitCap;
+    $("#cfg-storage-safety").value=CFG.storageSafetySubSec;
+    $("#cfg-min-floor").value=CFG.minFloorSec;
+
+    $("#btn-res-toggle").onclick=()=>{ applyGuiToCfg(); if(resLoopRunning) stopResLoop(); else startResLoop(); };
+    $("#btn-mint-toggle").onclick=()=>{ applyGuiToCfg(); if(mintRunning) coinMintBot.stop(); else coinMintBot.start(); };
+    $("#btn-save").onclick=()=>{ applyGuiToCfg(); saveCfg(CFG); alert("Beállítások mentve."); };
+
+    function applyGuiToCfg(){
+      const minV=Math.max(30, Number($("#cfg-res-min").value)||30);
+      let maxV=Math.max(30, Number($("#cfg-res-max").value)||minV);
+      if(maxV<minV) maxV=minV;
+      CFG.resFetchMinMin=minV;
+      CFG.resFetchMaxMin=maxV;
+      CFG.keepWhPercent=Math.max(0,Math.min(100, Number($("#cfg-wh").value)||0));
+      CFG.coinWaitCapMinMin=Math.max(1, Number($("#cfg-capmin").value)||1);
+      CFG.coinWaitCapMaxMin=Math.max(CFG.coinWaitCapMinMin, Number($("#cfg-capmax").value)||CFG.coinWaitCapMinMin);
+      CFG.enableWaitCap=!!$("#cfg-cap-enable").checked;
+      CFG.storageSafetySubSec=Math.max(0, Number($("#cfg-storage-safety").value)||0);
+      CFG.minFloorSec=Math.max(1, Number($("#cfg-min-floor").value)||1);
+      ENABLE_WAIT_CAP=!!CFG.enableWaitCap;
+      STORAGE_SAFETY_SUB_MS=CFG.storageSafetySubSec*1000;
+      MIN_FLOOR_MS=CFG.minFloorSec*1000;
+      saveCfg(CFG);
+      updateGuiStates();
+    }
+    updateGuiStates();
+    updateCoinBadge();
+  }
+  function updateGuiStates(){
+    if(!guiBox) return;
+    const btnRes=guiBox.querySelector("#btn-res-toggle");
+    const btnMint=guiBox.querySelector("#btn-mint-toggle");
+    if(btnRes){
+      if(resLoopRunning){ btnRes.textContent="Res: STOP"; btnRes.style.background="#600"; btnRes.style.borderColor="#933"; }
+      else { btnRes.textContent="Res: START"; btnRes.style.background="#235"; btnRes.style.borderColor="#124"; }
+    }
+    if(btnMint){
+      if(mintRunning){ btnMint.textContent="Mint: STOP"; btnMint.style.background="#600"; btnMint.style.borderColor="#933"; }
+      else { btnMint.textContent="Mint: START"; btnMint.style.background="#2e7d32"; btnMint.style.borderColor="#1b5e20"; }
+    }
+  }
+  function updateCoinBadge(){
+    if(!coinBadge) return;
+    coinBadge.textContent = `🪙 ${getDailyTotal()}`;
+  }
+
+  (async ()=>{
+    console.log(LOG,"Betöltve. Lock + auto-submit + tab close + GUI coin badge.");
+    makeGui();
+    setInterval(updateCoinBadge, 5000);
+    if (CFG.autoStartRes)  startResLoop();
+    if (CFG.autoStartMint) coinMintBot.start();
+  })();
+
+})();
