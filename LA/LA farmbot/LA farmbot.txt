@@ -1,0 +1,1224 @@
+//author fmthemaster
+//discord: fmthemaster#7485
+/* globals TWMap , csrf_token*/
+
+
+/******PROGRAM VARS**********/
+//specific
+var LA_ids=[];
+var toToggleBack = [];
+var depthMax = 3;
+var loadingLAstuff = false;
+var fmMapLASettings;
+var autoFarmInterval = null;
+var autoFarmRunning = false;
+var villageHaulData = {};
+var villageLossData = {};
+var lastMainPanelPosition = null; // Tárolja az elsődleges panel utolsó pozícióját
+
+//general
+const scriptName = "LA farmbot";
+var scriptTag = "fmMapLA";
+var forumLink = "https://forum.tribalwars.net/index.php?threads/hide-barbarians-in-la.286468/";
+var sitter = "";
+var runScreen = "screen=map";
+/******PROGRAM VARS**********/
+
+function main(){
+    if($(`#${scriptTag}_popup_container`).length){
+        UI.ErrorMessage("A script már be van töltve. Töltsd be újra az oldalt a script futtatása előtt.");
+        return;
+    }
+    let sitterQuery = window.location.search.match(/t=\d+/g);
+    if(sitterQuery)
+        sitter = sitterQuery;
+    if(window.location.href.indexOf(`${runScreen}`)==-1)
+    {
+        UI.ErrorMessage("A script csak térképen fut");
+        window.location.href = window.location.pathname+ `?${sitter?sitter+"&":""}${runScreen}`;
+        return;
+    }
+
+    getCache();
+    setHTML();
+    watchForErrors();
+}
+
+
+/**************HTML***************/
+
+
+function setHTML(){
+
+    let html =`
+    <div id="${scriptTag}_sidePanel" class="${scriptTag}_side_panel">
+        <div class="${scriptTag}_side_panel_content">
+            <div style="padding: 10px;">
+                <h3 class="fm_centered">Barbárnevelő Sablonok</h3>
+                
+                <table class="vis" style="width: 100%; font-size: 11px;">
+                    <thead id="${scriptTag}_templateTableHead">
+                    </thead>
+                    <tbody id="${scriptTag}_templateTableBody">
+                    </tbody>
+                </table>
+                
+                <!-- Mentés gomb -->
+                <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
+                    <button id="${scriptTag}_saveAllTemplates" class="btn btn-confirm-yes" style="width: 100%;">Sablonok mentése</button>
+                </div>
+            </div>
+            
+            <div id="${scriptTag}_catapultTableContainer" style="padding: 10px; overflow-y: auto;">
+                <h4 class="fm_centered" style="margin: 5px 0;">Katapult táblázat</h4>
+                <table class="vis" style="width: 100%; font-size: 11px;">
+                    <thead>
+                        <tr>
+                            <th style="text-align:center;">Szint</th>
+                            <th style="text-align:center;">Katapult</th>
+                            <th style="text-align:center;">Összesen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="row_a"><td style="text-align:center;">30 → 29</td><td style="text-align:center;">20</td><td style="text-align:center;">238</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">29 → 28</td><td style="text-align:center;">19</td><td style="text-align:center;">218</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">28 → 27</td><td style="text-align:center;">17</td><td style="text-align:center;">199</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">27 → 26</td><td style="text-align:center;">16</td><td style="text-align:center;">182</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">26 → 25</td><td style="text-align:center;">15</td><td style="text-align:center;">166</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">25 → 24</td><td style="text-align:center;">13</td><td style="text-align:center;">151</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">24 → 23</td><td style="text-align:center;">12</td><td style="text-align:center;">138</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">23 → 22</td><td style="text-align:center;">11</td><td style="text-align:center;">126</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">22 → 21</td><td style="text-align:center;">11</td><td style="text-align:center;">115</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">21 → 20</td><td style="text-align:center;">10</td><td style="text-align:center;">104</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">20 → 19</td><td style="text-align:center;">9</td><td style="text-align:center;">94</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">19 → 18</td><td style="text-align:center;">8</td><td style="text-align:center;">85</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">18 → 17</td><td style="text-align:center;">8</td><td style="text-align:center;">77</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">17 → 16</td><td style="text-align:center;">7</td><td style="text-align:center;">69</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">16 → 15</td><td style="text-align:center;">6</td><td style="text-align:center;">62</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">15 → 14</td><td style="text-align:center;">6</td><td style="text-align:center;">56</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">14 → 13</td><td style="text-align:center;">6</td><td style="text-align:center;">50</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">13 → 12</td><td style="text-align:center;">5</td><td style="text-align:center;">44</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">12 → 11</td><td style="text-align:center;">5</td><td style="text-align:center;">39</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">11 → 10</td><td style="text-align:center;">4</td><td style="text-align:center;">34</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">10 → 9</td><td style="text-align:center;">4</td><td style="text-align:center;">30</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">9 → 8</td><td style="text-align:center;">4</td><td style="text-align:center;">26</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">8 → 7</td><td style="text-align:center;">4</td><td style="text-align:center;">22</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">7 → 6</td><td style="text-align:center;">3</td><td style="text-align:center;">18</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">6 → 5</td><td style="text-align:center;">3</td><td style="text-align:center;">15</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">5 → 4</td><td style="text-align:center;">3</td><td style="text-align:center;">12</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">4 → 3</td><td style="text-align:center;">3</td><td style="text-align:center;">9</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">3 → 2</td><td style="text-align:center;">2</td><td style="text-align:center;">6</td></tr>
+                        <tr class="row_a"><td style="text-align:center;">2 → 1</td><td style="text-align:center;">2</td><td style="text-align:center;">4</td></tr>
+                        <tr class="row_b"><td style="text-align:center;">1 → 0</td><td style="text-align:center;">2</td><td style="text-align:center;">2</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div id="${scriptTag}_popup_container" class="fm_popup_container">
+        <div>
+            <a class="popup_box_close tooltip-delayed" id="${scriptTag}_popup_cross" href="javascript:void(0)"> 
+            </a>
+            <div id="${scriptTag}_popup_content" class="fm_popup_content">
+                <h3 class ="fm_centered">${scriptName}</h3>
+                <div style="padding:5px;">
+                    <div style="border: 1px solid #804000; padding: 5px;">    
+                        <div>
+                            <input type="checkbox" id="${scriptTag}_barbTrainerToggle" class="${scriptTag}_checkbox">
+                            <label for="${scriptTag}_barbTrainerToggle"><b>Barbárnevelő BE/KI</b></label>
+                        </div>
+                    </div>
+                </div>
+                <br>
+                <div style="padding:5px;">
+                    <div style="border: 1px solid #804000; padding: 5px;">    
+                        <div>
+                            <input type="checkbox" id="${scriptTag}_smartTemplate" class="${scriptTag}_checkbox">
+                            <label for="${scriptTag}_smartTemplate"><b>Okos sablon választás (veszteség + nyersanyag alapján)</b></label>
+                        </div>
+                    </div>
+                </div>
+                <br>
+                <div class="${scriptTag}_keyPress">
+                    <table style="width:100%; border-collapse: collapse;">
+                        <tbody class="vis">
+                            <tr class="row_b">
+                                <th rowspan="2" style="width:50%; text-align:left; padding-left:10px; vertical-align: middle;">
+                                    Gyorsbillentyűk farmoláshoz:
+                                </th>
+                                <th style="width:25%; text-align:center; padding: 5px;">
+                                    <a href="javascript:void(0);" class="${scriptTag}_farm_keybind ${scriptTag}_farm_icon farm_icon farm_icon_a" data-farmtype="a" style="display: inline-block;"></a>
+                                </th>
+                                <th style="width:25%; text-align:center; padding: 5px;">
+                                    <a href="javascript:void(0);" class="${scriptTag}_farm_keybind ${scriptTag}_farm_icon farm_icon farm_icon_b" data-farmtype="b" style="display: inline-block;"></a>
+                                </th>
+                            </tr>
+                            <tr class= "row_b">
+                                <td style="width:25%; text-align:center; padding: 5px;">
+                                    <input type="text" id="${scriptTag}_keybindA" maxlength="1" size="1" style="text-align:center; text-transform:uppercase; width: 30px; border: 1px solid #804000;">
+                                </td>
+                                <td style="width:25%; text-align:center; padding: 5px;">
+                                    <input type="text" id="${scriptTag}_keybindB" maxlength="1" size="1" style="text-align:center; text-transform:uppercase; width: 30px; border: 1px solid #804000;">
+                                </td>
+                            </tr>
+                        </tbody> 
+                    </table>
+                </div>
+                <br>
+                <div style="border: 1px solid #804000; padding: 10px; background-color: #f4e4bc;">
+                    <h4 class="fm_centered" style="margin: 5px 0;">Automatikus Farmolás</h4>
+                    <p style="text-align: center; margin: 10px 0;">
+                        <button id="${scriptTag}_autoFarmStart" class="btn btn-confirm-yes" style="position: relative;">
+                            Indítás
+                        </button>
+                        <button id="${scriptTag}_autoFarmStop" class="btn btn-cancel" style="position: relative; display: none;">
+                            Leállítás
+                        </button>
+                    </p>
+                    <p id="${scriptTag}_autoFarmStatus" style="text-align: center; font-weight: bold; color: #804000; margin: 5px 0;">
+                        Állapot: Leállítva
+                    </p>
+                    <p style="text-align: center; font-size: 11px; color: #666; margin: 5px 0;">
+                        Random késleltetés: 200-300ms
+                    </p>
+                </div>
+                <br>
+                <br>
+                <div id="${scriptTag}_LAlist">
+                    <table id="${scriptTag}_mainTable" style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th style="width:35%;">Falvak</th>
+                                <th style="width:20%; cursor:pointer;" id="${scriptTag}_sortDistance" title="Kattints a rendezéshez"><img src="/graphic/rechts.png"> ▼</th>
+                                <th style="width:22.5%;">A</th>
+                                <th style="width:22.5%;">B</th>
+                            </tr>
+                        </thead>
+                        <tbody id="${scriptTag}_popupTable" class="vis">
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    <label for="${scriptTag}_maxDistance">Max távolság:</label>
+                    <input type="number" id="${scriptTag}_maxDistance" value="50" size="4" min="1" max="200" style="width:60px;">
+                    <input id="${scriptTag}_reloadWithDistance" value="Szűrés" class="btn" type="submit">
+                </p>
+                <p>
+                    <input class="btn btn-confirm-yes" id="${scriptTag}_reloadTable" type="submit" value="Tábla újratöltése">
+                </p>
+                <br>
+                <br>
+                <br>    
+            </div>
+        </div>
+    </div>
+    
+    <style>
+        /*general css*/
+        .fm_popup_container {
+            border: 19px solid #804000;
+            -moz-border-image: url("/graphic/popup/border.png") 9 19 19 19 repeat;
+            -webkit-border-image: url("/graphic/popup/border.png") 9 19 19 19 repeat;
+            -o-border-image: url("/graphic/popup/border.png") 19 19 19 19 repeat;
+            border-image: url("/graphic/popup/border.png") 19 19 19 19 repeat;
+            display: block;
+            position: fixed;
+            top: 8%;
+            left: 70%;
+            z-index: 14000;
+        }
+        .fm_popup_content {
+            min-width: 200px;
+            min-height: 120px;            
+            height:100%;
+            overflow: hidden;
+            background-image: url('/graphic/popup/content_background.png');
+        }
+        .fm_centered {
+            text-align: center;
+        }
+        
+        /* Side Panel CSS */
+        .${scriptTag}_side_panel {
+            position: fixed;
+            top: 8%;
+            width: 600px;
+            background-image: url('/graphic/popup/content_background.png');
+            border: 19px solid #804000;
+            -moz-border-image: url("/graphic/popup/border.png") 9 19 19 19 repeat;
+            -webkit-border-image: url("/graphic/popup/border.png") 9 19 19 19 repeat;
+            -o-border-image: url("/graphic/popup/border.png") 19 19 19 19 repeat;
+            border-image: url("/graphic/popup/border.png") 19 19 19 19 repeat;
+            z-index: 14000;
+            display: none;
+        }
+        
+        .${scriptTag}_side_panel.visible {
+            display: block;
+        }
+        
+        .${scriptTag}_side_panel_content {
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /*specific css*/
+        .${scriptTag}_tableHeader{
+            height: 35px;
+            text-align: text-bottom;
+        }
+        #${scriptTag}_LAlist {
+            overflow-y:auto; 
+            max-height:30vh;
+        }
+        #${scriptTag}_LAlist td, #${scriptTag}_LAlist th{
+            text-align: center; 
+        }
+        .${scriptTag}_farm_icon{
+            transform: scale(1.2);
+            width: 24px;
+            height: 24px;
+            display: inline-block;
+        }
+        .${scriptTag}_td_farm_icon{
+            width: 22.5%;
+            height: 30px;
+            text-align: center;
+        }
+
+        .btn-confirm-yes{
+            position: absolute;
+            right: 5px;
+        }
+        
+        #${scriptTag}_sortDistance:hover {
+            background-color: #f4e4bc;
+        }
+        
+        .${scriptTag}_disabled_farm {
+            opacity: 0.3;
+            pointer-events: none;
+            cursor: not-allowed;
+        }
+        
+        /* Z, Y, X ikonok - félátlátszó sötét háttérrel */
+        .farm_icon_z,
+        .farm_icon_y,
+        .farm_icon_x {
+            height: 24px;
+            width: 24px;
+            display: inline-block;
+            background-image: url(https://dshu.innogamescdn.com/asset/87fb3154/graphic/map/icons_context.webp);
+            position: relative;
+        }
+        
+        /* Z ikon */
+        .farm_icon_z {
+            background-position: -264px 0px;
+        }
+        
+        .farm_icon_z::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 2px;
+        }
+        
+        .farm_icon_z::after {
+            content: 'Z';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            font-size: 16px;
+            color: #fff;
+            text-shadow: 1px 1px 3px #000, -1px -1px 3px #000, 1px -1px 3px #000, -1px 1px 3px #000;
+            font-family: Arial, sans-serif;
+            z-index: 2;
+        }
+        
+        /* Y ikon */
+        .farm_icon_y {
+            background-position: -264px 0px;
+        }
+        
+        .farm_icon_y::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 2px;
+        }
+        
+        .farm_icon_y::after {
+            content: 'Y';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            font-size: 16px;
+            color: #fff;
+            text-shadow: 1px 1px 3px #000, -1px -1px 3px #000, 1px -1px 3px #000, -1px 1px 3px #000;
+            font-family: Arial, sans-serif;
+            z-index: 2;
+        }
+        
+        /* X ikon */
+        .farm_icon_x {
+            background-position: -264px 0px;
+        }
+        
+        .farm_icon_x::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 2px;
+        }
+        
+        .farm_icon_x::after {
+            content: 'X';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            font-size: 16px;
+            color: #fff;
+            text-shadow: 1px 1px 3px #000, -1px -1px 3px #000, 1px -1px 3px #000, -1px 1px 3px #000;
+            font-family: Arial, sans-serif;
+            z-index: 2;
+        }
+        
+        /* Template input */
+        .${scriptTag}_template_input {
+            width: 45px;
+            text-align: center;
+        }
+    </style>`;
+
+    $("body").append(html);
+    
+    // Táblázat generálás
+    generateTemplateTable();
+    
+    // Kezdeti pozíció beállítás
+    updateSidePanelPosition();
+    
+    // JAVÍTÁS: Draggable - minden mozgásnál azonnal frissül a mellékpanel
+    $(`#${scriptTag}_popup_container`).draggable({
+        start: function() {
+            // Drag kezdődik
+        },
+        drag: function() {
+            // FONTOS: Töröljük a cache-t hogy minden mozgásnál frissüljön
+            lastMainPanelPosition = null;
+            updateSidePanelPosition();
+        },
+        stop: function() {
+            // Drag véget ért
+            updateSidePanelPosition();
+        }
+    });
+    
+    $(`#${scriptTag}_popup_cross`).click(closePopup);
+    
+    // Barbárnevelő toggle
+    $(`#${scriptTag}_barbTrainerToggle`).on("change", function(){
+        if($(this).prop("checked")) {
+            $(`#${scriptTag}_sidePanel`).addClass('visible');
+            // Kis késleltetés hogy a DOM frissüljön
+            setTimeout(updateSidePanelPosition, 100);
+        } else {
+            $(`#${scriptTag}_sidePanel`).removeClass('visible');
+        }
+        getHTMLOptions();
+        setCache();
+    });
+    
+    // Közös mentés gomb minden sablonhoz
+    $(`#${scriptTag}_saveAllTemplates`).click(function(){
+        saveAllTemplates();
+    });
+    
+    // Sablon input mezők változása
+    $(document).on('change', `.${scriptTag}_template_input`, function(){
+        let template = $(this).data('template');
+        let unit = $(this).data('unit');
+        let value = parseInt($(this).val()) || 0;
+        
+        if(value < 0) {
+            $(this).val(0);
+            value = 0;
+        }
+        
+        if(!fmMapLASettings.templates[template]) {
+            fmMapLASettings.templates[template] = {};
+        }
+        
+        fmMapLASettings.templates[template][unit] = value;
+    });
+    
+    $(`#${scriptTag}_reloadTable`).click(getFirstFarmPage);
+    $(`#${scriptTag}_maxDistance`).click(focusSelect);
+    $(`#${scriptTag}_reloadWithDistance`).click(function(){
+        let maxDist = parseFloat($(`#${scriptTag}_maxDistance`).val());
+        if(maxDist && maxDist > 0) {
+            fmMapLASettings.maxDistance = maxDist;
+            setCache();
+            getFirstFarmPage();
+        }
+    });
+    
+    $(`#${scriptTag}_sortDistance`).click(function(){
+        sortTableByDistance();
+    });
+
+    setHTMLOptions();
+    getHTMLOptions();
+    loadTemplates();
+
+    $(`.${scriptTag}_checkbox`).on("change",()=>{
+        getHTMLOptions();
+        setCache(); 
+    });
+
+    $(`#${scriptTag}_keybindA, #${scriptTag}_keybindB`).on("change keyup", function(){
+        $(this).val($(this).val().toUpperCase());
+        getHTMLOptions();
+        setCache();
+    });
+
+    $(`#${scriptTag}_autoFarmStart`).click(startAutoFarm);
+    $(`#${scriptTag}_autoFarmStop`).click(stopAutoFarm);
+
+    $(document).on('keydown', function(e) {
+        let target = e.target.tagName;
+        if(target === 'INPUT' || target === 'TEXTAREA' || $(e.target).attr('contenteditable') === 'true') {
+            return;
+        }
+
+        let pressedKey = e.key.toUpperCase();
+
+        if(pressedKey === fmMapLASettings.keybindA) {
+            let firstVillage = $(`.${scriptTag}_sendFarm[data-farmtype='a']:not(.${scriptTag}_disabled_farm)`).first();
+            if(firstVillage.length && !loadingLAstuff) {
+                let xy = parseInt(firstVillage.data('villagexy'));
+                let template = getSmartTemplate(xy);
+                if(template) {
+                    farmVillage(xy, template);
+                    firstVillage.closest("tr").remove();
+                }
+            }
+        }
+        else if(pressedKey === fmMapLASettings.keybindB) {
+            let firstVillage = $(`.${scriptTag}_sendFarm[data-farmtype='b']:not(.${scriptTag}_disabled_farm)`).first();
+            if(firstVillage.length && !loadingLAstuff) {
+                let xy = parseInt(firstVillage.data('villagexy'));
+                let template = getSmartTemplate(xy);
+                if(template) {
+                    farmVillage(xy, template);
+                    firstVillage.closest("tr").remove();
+                }
+            }
+        }
+    });
+
+    getFirstFarmPage();
+    startPositionWatcher(); // Folyamatosan figyeli az elsődleges panel pozícióját
+}
+
+function generateTemplateTable() {
+    // Biztosítjuk hogy a templates objektum létezik
+    if(!fmMapLASettings.templates) {
+        fmMapLASettings.templates = {
+            z: {},
+            y: {},
+            x: {}
+        };
+    }
+    
+    // Inicializáljuk a sablonokat ha üresek
+    ['z', 'y', 'x'].forEach(template => {
+        if(!fmMapLASettings.templates[template]) {
+            fmMapLASettings.templates[template] = {};
+        }
+        for(let x = 0; x < game_data.units.length; x++){
+            if(game_data.units[x] != "militia" && game_data.units[x] != "snob"){
+                if(fmMapLASettings.templates[template][game_data.units[x]] === undefined) {
+                    fmMapLASettings.templates[template][game_data.units[x]] = 0;
+                }
+            }
+        }
+    });
+    
+    // Fejléc
+    let headerHTML = '<tr><th style="text-align:center;">Sablon</th>';
+    for(let x = 0; x < game_data.units.length; x++){
+        if(game_data.units[x] == "militia" || game_data.units[x] == "snob"){
+            continue;
+        }
+        headerHTML += `<th style="text-align:center;"><img src="https://dshu.innogamescdn.com/asset/87fb3154/graphic/unit/unit_${game_data.units[x]}.png" style="width: 20px; height: 20px;" title="${game_data.units[x]}"></th>`;
+    }
+    headerHTML += '</tr>';
+    $(`#${scriptTag}_templateTableHead`).html(headerHTML);
+    
+    // Sorok (Z, Y, X)
+    let templates = ['z', 'y', 'x'];
+    let bodyHTML = '';
+    
+    templates.forEach(template => {
+        bodyHTML += `<tr><td style="text-align: center;"><a class="farm_icon farm_icon_${template}" href="javascript:;" style="display: inline-block;"></a></td>`;
+        
+        for(let x = 0; x < game_data.units.length; x++){
+            if(game_data.units[x] == "militia" || game_data.units[x] == "snob"){
+                continue;
+            }
+            bodyHTML += `<td style="text-align: center;"><input id="${scriptTag}_template_${template}_${game_data.units[x]}" class="${scriptTag}_template_input" data-template="${template}" data-unit="${game_data.units[x]}" type="number" min="0" max="999" value="0" style="width: 45px; text-align: center;"></td>`;
+        }
+        
+        bodyHTML += '</tr>';
+    });
+    
+    $(`#${scriptTag}_templateTableBody`).html(bodyHTML);
+}
+
+function saveAllTemplates() {
+    let templates = ['z', 'y', 'x'];
+    
+    templates.forEach(template => {
+        if(!fmMapLASettings.templates[template]) {
+            fmMapLASettings.templates[template] = {};
+        }
+        
+        for(let x = 0; x < game_data.units.length; x++){
+            if(game_data.units[x] == "militia" || game_data.units[x] == "snob"){
+                continue;
+            }
+            
+            let value = parseInt($(`#${scriptTag}_template_${template}_${game_data.units[x]}`).val()) || 0;
+            fmMapLASettings.templates[template][game_data.units[x]] = value;
+        }
+    });
+    
+    setCache();
+    UI.SuccessMessage('Minden sablon elmentve!');
+}
+
+function saveTemplate(template) {
+    if(!fmMapLASettings.templates[template]) {
+        fmMapLASettings.templates[template] = {};
+    }
+    
+    for(let x = 0; x < game_data.units.length; x++){
+        if(game_data.units[x] == "militia" || game_data.units[x] == "snob"){
+            continue;
+        }
+        
+        let value = parseInt($(`#${scriptTag}_template_${template}_${game_data.units[x]}`).val()) || 0;
+        fmMapLASettings.templates[template][game_data.units[x]] = value;
+    }
+    
+    setCache();
+}
+
+function loadTemplates() {
+    let templates = ['z', 'y', 'x'];
+    templates.forEach(template => {
+        if(fmMapLASettings.templates && fmMapLASettings.templates[template]) {
+            let data = fmMapLASettings.templates[template];
+            
+            for(let x = 0; x < game_data.units.length; x++){
+                if(game_data.units[x] == "militia" || game_data.units[x] == "snob"){
+                    continue;
+                }
+                
+                let value = data[game_data.units[x]] || 0;
+                $(`#${scriptTag}_template_${template}_${game_data.units[x]}`).val(value);
+            }
+        }
+    });
+}
+
+function getTemplateValues(template) {
+    let templateData = {};
+    
+    for(let x = 0; x < game_data.units.length; x++){
+        if(game_data.units[x] == "militia" || game_data.units[x] == "snob"){
+            continue;
+        }
+        
+        let value = parseInt($(`#${scriptTag}_template_${template}_${game_data.units[x]}`).val()) || 0;
+        templateData[game_data.units[x]] = value;
+    }
+    
+    return templateData;
+}
+
+function updateSidePanelPosition() {
+    if($(`#${scriptTag}_barbTrainerToggle`).prop("checked")) {
+        let mainPanel = $(`#${scriptTag}_popup_container`);
+        let sidePanel = $(`#${scriptTag}_sidePanel`);
+        
+        // Ha a main panel nem látható, ne mutassuk a side panelt sem
+        if(!mainPanel.is(':visible') || !mainPanel.length) {
+            sidePanel.hide();
+            return;
+        }
+        
+        sidePanel.show();
+        
+        let mainOffset = mainPanel.offset();
+        let mainHeight = mainPanel.outerHeight();
+        
+        // Csak frissítsük ha az elsődleges panel pozíciója változott
+        let currentPosition = {
+            left: Math.round(mainOffset.left),
+            top: Math.round(mainOffset.top),
+            height: mainHeight
+        };
+        
+        // Ha a pozíció nem változott, ne csináljunk semmit
+        if(lastMainPanelPosition && 
+           lastMainPanelPosition.left === currentPosition.left && 
+           lastMainPanelPosition.top === currentPosition.top &&
+           lastMainPanelPosition.height === currentPosition.height) {
+            return; // NEM frissítünk
+        }
+        
+        // Pozíció megváltozott, elmentjük és frissítjük a másodlagos panelt
+        lastMainPanelPosition = currentPosition;
+        
+        // Bal oldali pozíció: főablak bal széle - mellékpanel szélessége
+        let leftPos = mainOffset.left - sidePanel.outerWidth() + 19;
+        
+        sidePanel.css({
+            'position': 'fixed',
+            'left': leftPos + 'px',
+            'top': mainOffset.top + 'px',
+            'height': mainHeight + 'px'
+        });
+        
+        // Katapult táblázat magasság számítása
+        let catapultContainer = $(`#${scriptTag}_catapultTableContainer`);
+        let templateTableHeight = $(`#${scriptTag}_templateTableHead`).outerHeight(true) + 
+                                   $(`#${scriptTag}_templateTableBody`).outerHeight(true) + 
+                                   $(`#${scriptTag}_saveAllTemplates`).outerHeight(true) + 60;
+        
+        catapultContainer.css({
+            'position': 'absolute',
+            'top': templateTableHeight + 'px',
+            'left': '0',
+            'right': '0',
+            'bottom': '0',
+            'overflow-y': 'auto'
+        });
+    }
+}
+
+function startPositionWatcher() {
+    // Gyorsabb frissítés: 50ms helyett 100ms
+    setInterval(function() {
+        if($(`#${scriptTag}_barbTrainerToggle`).prop("checked") && $(`#${scriptTag}_popup_container`).length) {
+            updateSidePanelPosition();
+        }
+    }, 50); // Gyorsabb reagálás
+}
+
+function getSmartTemplate(xy) {
+    let lossStatus = villageLossData[xy];
+    let haulStatus = villageHaulData[xy];
+    
+    if(lossStatus === 'full_loss') {
+        console.log(`Falu ${xy}: 🔴 PIROS (teljes veszteség) - NEM küld semmit`);
+        return null;
+    }
+    
+    if(lossStatus === 'partial_loss') {
+        console.log(`Falu ${xy}: 🟡 SÁRGA (részleges veszteség) - B sablon használata`);
+        return 'b';
+    }
+    
+    if(lossStatus === 'no_loss') {
+        if(!fmMapLASettings.smartTemplate) {
+            console.log(`Falu ${xy}: 🟢 ZÖLD (nincs veszteség) - A sablon (okos választás ki van kapcsolva)`);
+            return 'a';
+        }
+        
+        if(haulStatus === 'full') {
+            console.log(`Falu ${xy}: 🟢 ZÖLD + 🟠 TELI (max_loot/1) - B sablon használata`);
+            return 'b';
+        } else if(haulStatus === 'empty') {
+            console.log(`Falu ${xy}: 🟢 ZÖLD + ⚪ ÜRES (max_loot/0) - A sablon használata`);
+            return 'a';
+        }
+    }
+    
+    console.log(`Falu ${xy}: ⚠️ NINCS ADAT - A sablon (alapértelmezett)`);
+    return 'a';
+}
+
+function addLARow(village){
+    if( typeof addLARow.counter == 'undefined' ) {
+        addLARow.counter = 0;
+    }
+
+    addLARow.counter++;
+    
+    let lossStatus = villageLossData[village.xy];
+    let disabledClass = lossStatus === 'full_loss' ? scriptTag + '_disabled_farm' : '';
+    let rowStyle = lossStatus === 'full_loss' ? 'style="opacity: 0.5;"' : '';
+    
+    $("#fmMapLA_popupTable").append(`
+    <tr class=${addLARow.counter%2?"row_a":"row_b"} ${rowStyle}>
+        <td style="width:35%;"><a href="${window.location.pathname}?${sitter?sitter+"&":""}&screen=info_village&id=${village.id}" target="_blank">${parseInt(village.xy/1000)}|${village.xy%1000}</a></td>
+        <td style="width:20%;" data-distance="${village.distance}">${village.distance}</td>
+        <td class="${scriptTag}_td_farm_icon"><a href="javascript:void(0);" class="${scriptTag}_farm_icon ${scriptTag}_sendFarm ${disabledClass} farm_icon farm_icon_a" data-farmtype="a" data-villagexy="${village.xy}"></a></td>
+        <td class="${scriptTag}_td_farm_icon"><a href="javascript:void(0);" class="${scriptTag}_farm_icon ${scriptTag}_sendFarm ${disabledClass} farm_icon farm_icon_b" data-farmtype="b" data-villagexy="${village.xy}"></a></td>
+    </tr>`);
+}
+
+function closePopup(){
+    stopAutoFarm();
+    $(`#${scriptTag}_popup_container`).remove();
+    $(`#${scriptTag}_sidePanel`).remove();
+}
+
+function focusSelect(){
+    this.focus();
+    this.select();
+}
+
+function sortTableByDistance() {
+    let table = document.getElementById(`${scriptTag}_mainTable`);
+    let rows = Array.from(table.querySelectorAll('tbody tr'));
+    let sortIndicator = $(`#${scriptTag}_sortDistance`);
+    let currentDirection = sortIndicator.data('direction') || 'asc';
+    
+    rows.sort(function(a, b) {
+        let distA = parseFloat(a.querySelector('td[data-distance]').getAttribute('data-distance'));
+        let distB = parseFloat(b.querySelector('td[data-distance]').getAttribute('data-distance'));
+        
+        if (currentDirection === 'asc') {
+            return distA - distB;
+        } else {
+            return distB - distA;
+        }
+    });
+    
+    let tbody = table.querySelector('tbody');
+    rows.forEach((row, index) => {
+        row.className = index % 2 ? 'row_a' : 'row_b';
+        tbody.appendChild(row);
+    });
+    
+    $(`.${scriptTag}_sendFarm`).off("click");
+    $(`.${scriptTag}_sendFarm`).click(function(){
+        if($(this).hasClass(`${scriptTag}_disabled_farm`)) {
+            UI.ErrorMessage("Ez a falu teljes veszteséget okozott, nem lehet támadni!");
+            return;
+        }
+        let xy = parseInt(this.dataset.villagexy);
+        let template = getSmartTemplate(xy);
+        if(template) {
+            farmVillage(xy, template);
+            $(this).closest("tr").remove();
+        } else {
+            UI.ErrorMessage("Ez a falu teljes veszteséget okozott, nem lehet támadni!");
+        }
+    });
+    
+    let newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+    sortIndicator.data('direction', newDirection);
+    sortIndicator.html(`<img src="/graphic/rechts.png"> ${newDirection === 'asc' ? '▼' : '▲'}`);
+}
+
+function makeLATable(){
+    let barbs = $.grep(Object.values(TWMap.villages), (obj)=>obj.owner=="0"&&obj.points);
+    
+    console.log(`Talált barbár falvak száma a térképen: ${barbs.length}`);
+    
+    let maxDistance = fmMapLASettings.maxDistance || 50;
+    
+    barbs = barbs.filter(function(barb){
+        let [x0,y0] = [game_data.village.x, game_data.village.y];
+        let [xa,ya] = [Math.floor(barb.xy/1000), barb.xy%1000];
+        barb.distance = Math.sqrt((xa-x0)**2 + (ya-y0)**2).toFixed(1);
+        return parseFloat(barb.distance) <= maxDistance;
+    });
+    
+    barbs.sort(function(a, b){
+        return parseFloat(a.distance) - parseFloat(b.distance);
+    });
+    
+    console.log(`Falvak ${maxDistance} távolságon belül: ${barbs.length}`);
+
+    $.each(barbs, (key, barb)=> addLARow(barb));
+    
+    $(`.${scriptTag}_sendFarm`).off("click");
+    $(`.${scriptTag}_sendFarm`).click(function(){
+        if($(this).hasClass(`${scriptTag}_disabled_farm`)) {
+            UI.ErrorMessage("Ez a falu teljes veszteséget okozott, nem lehet támadni!");
+            return;
+        }
+        let xy = parseInt(this.dataset.villagexy);
+        let template = getSmartTemplate(xy);
+        if(template) {
+            farmVillage(xy, template);
+            $(this).closest("tr").remove();
+        } else {
+            UI.ErrorMessage("Ez a falu teljes veszteséget okozott, nem lehet támadni!");
+        }
+    });
+}
+
+function startLoader(length)
+{
+    let width = $("#contentContainer")[0].clientWidth;
+    $("#contentContainer").eq(0).prepend(`
+    <div id="progressbar" class="progress-bar">
+        <span class="count label">0/${length}</span>
+        <div id="progress"><span class="count label" style="width: ${width}px;">0/${length}</span></div>
+    </div>`);
+}
+
+function loaded(num, length, action)
+{
+    $("#progress").css("width", `${(num + 1) / length * 100}%`);
+    $(".count").text(`${action} ${(num + 1)} / ${length}`);
+    if(num+1==length)
+        endLoader();
+}
+
+function endLoader()
+{
+    if($("#progressbar").length > 0)
+        $("#progressbar").remove();
+}
+
+function executeQueue(queue, timeout, {loadText="",callback=()=>null}){
+    if(queue.length){
+        startLoader(queue.length);
+        $.each(queue,(key, func)=>{
+            setTimeout(()=>{
+                loaded(key, queue.length, loadText);
+                if(key==queue.length -1){
+                    setTimeout(callback, timeout);
+                    endLoader();
+                }
+                func();
+            }, timeout*key);
+        });
+    }
+    else
+        setTimeout(callback, timeout);
+}
+
+async function getFirstFarmPage(){
+    $(`#${scriptTag}_LAlist`).find("tbody > tr").each(function(){$(this).remove();});
+    villageHaulData = {};
+    villageLossData = {};
+    LA_ids = [];
+    
+    loadingLAstuff = true;
+    
+    $.get(`/game.php?${sitter?sitter+"&":""}village=${game_data.village.id}&screen=am_farm&Farm_page=0`, async (data)=> {
+            const parser = new DOMParser();
+            const doc= await parser.parseFromString(data, "text/html");
+            
+            let LAscript = $("#am_widget_Farm", doc).find("script")[0];
+            if(!LAscript){
+                console.log("Nincs Farm Asszisztens, csak térkép adatok használata");
+                makeLATable();
+                loadingLAstuff = false;
+                return;
+            }
+
+            getBarbsInLA(0);
+        }).fail(()=>{
+            console.log("Farm Asszisztens betöltés sikertelen, csak térkép adatok használata"); 
+            makeLATable();
+            loadingLAstuff = false;
+        });
+}
+
+async function getBarbsInLA(page, depth=0, npages=undefined) {
+    console.log("getBarbsInLA", page, depth, npages);
+    let url = `/game.php?${sitter?sitter+"&":""}village=${game_data.village.id}&screen=am_farm&Farm_page=${page}`;
+    $.get(url, async (data)=> {
+        console.log("success");
+        const parser = new DOMParser();
+        const doc= await parser.parseFromString(data, "text/html");
+        const pageSelector = $(".paged-nav-item:last", doc); 
+        const npagesLA = parseInt(pageSelector.length? pageSelector[0].innerText.match(/\d+/g)[0]:0);
+        let rows = $("#plunder_list", doc).find("tr[id^=village_]");
+        
+        if(rows.length){
+            $.each(rows, function(key, row){
+                let villageId = row.id.match(/\d+/g)[0];
+                LA_ids.push(villageId);
+                
+                let coordCell = $(row).find('td').eq(3);
+                let coordText = coordCell.text().trim();
+                let coordMatch = coordText.match(/\((\d+)\|(\d+)\)/);
+                if(!coordMatch) return;
+                
+                let xy = parseInt(coordMatch[1]) * 1000 + parseInt(coordMatch[2]);
+                
+                let lossCell = $(row).find('td').eq(1);
+                let lossImg = lossCell.find('img').attr('src') || '';
+                let lossStatus = 'no_loss';
+                
+                if(lossImg.includes('dots_red') || lossImg.includes('red.png') || lossImg.includes('red.webp')) {
+                    lossStatus = 'full_loss';
+                } else if(lossImg.includes('dots_yellow') || lossImg.includes('yellow.png') || lossImg.includes('yellow.webp')) {
+                    lossStatus = 'partial_loss';
+                } else if(lossImg.includes('dots_green') || lossImg.includes('green.png') || lossImg.includes('green.webp')) {
+                    lossStatus = 'no_loss';
+                }
+                
+                villageLossData[xy] = lossStatus;
+                
+                let haulCell = $(row).find('td').eq(2);
+                let haulImg = haulCell.find('img').attr('src') || '';
+                let haulStatus = 'empty';
+                
+                if(haulImg.includes('max_loot/1')) {
+                    haulStatus = 'full';
+                } else if(haulImg.includes('max_loot/0')) {
+                    haulStatus = 'empty';
+                }
+                
+                villageHaulData[xy] = haulStatus;
+                
+                let lossText = lossStatus === 'full_loss' ? '🔴 PIROS' : (lossStatus === 'partial_loss' ? '🟡 SÁRGA' : '🟢 ZÖLD');
+                let haulText = haulStatus === 'full' ? '🟠 TELI' : '⚪ ÜRES';
+                console.log(`Falu ${xy} (${coordMatch[1]}|${coordMatch[2]}): Veszteség=${lossText}, Nyersanyag=${haulText}`);
+            });
+        }
+        
+        if(!npages){
+            let pageQueue=[];
+            for(var i = 1; i < npagesLA; i++){
+                const j =i;
+                pageQueue.push(()=>getBarbsInLA(j,0,npagesLA));
+            }
+            executeQueue(pageQueue, 300, {loadText:"loading LA pages",callback:()=>{
+                makeLATable();
+                loadingLAstuff=false;
+            }});
+
+        }
+    }).fail(()=>{
+        if(depth < depthMax){
+            UI.ErrorMessage(`Failed getting page ${page} of LA for the ${depth} time, will try again`);
+            console.log(`Failed getting page ${page} of LA for the ${depth} time, will try again`);
+            getBarbsInLA(page, depth +1, npages);
+        }
+        else{
+            UI.ErrorMessage(`Failed getting page ${page} of LA for the ${depth} time, will not try again, getting next page`);
+            console.log(`Failed getting page ${page} of LA for the ${depth} time, will try again`);
+            getBarbsInLA(page +1, depth +1, npages);
+
+        }
+    });
+}
+
+function farmVillage (xy, type) {
+    console.log(xy,type);
+    let village = TWMap.villages[xy];
+    console.log("Farming Village: ");
+    console.log(village);
+    let villageid = village.id;
+    let s=TWMap.popup._cache[villageid]; 
+    if(void 0===s) 
+        TWMap.popup.loadVillage(villageid);
+
+    let mpFarm = type=="a"?"mp_farm_a":"mp_farm_b";
+
+    let url = TWMap.urls.ctx[mpFarm].replace(/__village__/, village.id).replace(/__source__/, game_data.village.id);
+
+    setTimeout(function(){TribalWars.get(url);},200);
+}
+
+function getRandomDelay(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function startAutoFarm() {
+    if(autoFarmRunning) return;
+    
+    autoFarmRunning = true;
+    $(`#${scriptTag}_autoFarmStart`).hide();
+    $(`#${scriptTag}_autoFarmStop`).show();
+    $(`#${scriptTag}_autoFarmStatus`).text("Állapot: Fut...").css("color", "#0a0");
+    
+    console.log("Automatikus farmolás elindítva");
+    autoFarmLoop();
+}
+
+function stopAutoFarm() {
+    if(!autoFarmRunning) return;
+    
+    autoFarmRunning = false;
+    if(autoFarmInterval) {
+        clearTimeout(autoFarmInterval);
+        autoFarmInterval = null;
+    }
+    
+    $(`#${scriptTag}_autoFarmStart`).show();
+    $(`#${scriptTag}_autoFarmStop`).hide();
+    $(`#${scriptTag}_autoFarmStatus`).text("Állapot: Leállítva").css("color", "#804000");
+    
+    console.log("Automatikus farmolás leállítva");
+}
+
+function autoFarmLoop() {
+    if(!autoFarmRunning) return;
+    
+    let firstVillage = $(`.${scriptTag}_sendFarm[data-farmtype='a']:not(.${scriptTag}_disabled_farm)`).first();
+    if(firstVillage.length && !loadingLAstuff) {
+        let xy = parseInt(firstVillage.data('villagexy'));
+        let template = getSmartTemplate(xy);
+        if(template) {
+            farmVillage(xy, template);
+            firstVillage.closest("tr").remove();
+            
+            let delay = getRandomDelay(200, 300);
+            autoFarmInterval = setTimeout(autoFarmLoop, delay);
+        } else {
+            firstVillage.closest("tr").remove();
+            autoFarmInterval = setTimeout(autoFarmLoop, 100);
+        }
+    } else {
+        console.log("Nincs több falu a listán, automata farm leáll");
+        stopAutoFarm();
+        UI.InfoMessage("Nincs több falu a farmolási listán!");
+    }
+}
+
+function watchForErrors() {
+    const originalErrorMessage = UI.ErrorMessage;
+    UI.ErrorMessage = function(message, duration, type) {
+        if(message && (
+            message.toLowerCase().includes("nincs elég") || 
+            message.toLowerCase().includes("nem áll rendelkezésre elegendő egység") ||
+            message.toLowerCase().includes("elegendő egység") ||
+            message.toLowerCase().includes("not enough") ||
+            message.toLowerCase().includes("keine einheit") ||
+            message.toLowerCase().includes("não há unidades")
+        )) {
+            console.log("Egység hiány észlelve - automata farm leáll:", message);
+            stopAutoFarm();
+            UI.InfoMessage("Automatikus farmolás leállítva: nincs elég egység!");
+        }
+        return originalErrorMessage.apply(this, arguments);
+    };
+    
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+                if(node.nodeType === 1) {
+                    let errorText = node.textContent || node.innerText;
+                    if(errorText && (
+                        errorText.includes("Nem áll rendelkezésre elegendő egység") ||
+                        errorText.includes("elegendő egység") ||
+                        errorText.includes("Nincs elég")
+                    )) {
+                        console.log("DOM hibaüzenet észlelve - automata farm leáll:", errorText);
+                        if(autoFarmRunning) {
+                            stopAutoFarm();
+                            UI.InfoMessage("Automatikus farmolás leállítva: nincs elég egység!");
+                        }
+                    }
+                }
+            });
+        });
+    });
+    
+    if(document.getElementById('error_box')) {
+        observer.observe(document.getElementById('error_box'), {
+            childList: true,
+            subtree: true
+        });
+    }
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+}
+
+function getCache(){
+    console.log("getting cache");
+    let cachedSettings = window.localStorage.getItem(`${scriptTag}_Settings`);
+    
+    if(cachedSettings) {
+        fmMapLASettings = JSON.parse(cachedSettings);
+        
+        // Biztosítjuk hogy a templates objektum létezik
+        if(!fmMapLASettings.templates) {
+            fmMapLASettings.templates = {
+                z: {},
+                y: {},
+                x: {}
+            };
+        }
+    } else {
+        fmMapLASettings = {
+            keybindA:'Q',
+            keybindB:'W',
+            smartTemplate:true,
+            maxDistance:50,
+            barbTrainerEnabled:false,
+            templates: {
+                z: {},
+                y: {},
+                x: {}
+            }
+        };
+    }
+}
+
+function setCache(){
+    console.log("setting cache");
+    window.localStorage.setItem(`${scriptTag}_Settings`, JSON.stringify(fmMapLASettings));
+}
+
+function setHTMLOptions(){
+    console.log("setting HTML options");
+    $(`#${scriptTag}_smartTemplate`).prop("checked", fmMapLASettings.smartTemplate);
+    $(`#${scriptTag}_barbTrainerToggle`).prop("checked", fmMapLASettings.barbTrainerEnabled);
+    $(`#${scriptTag}_keybindA`).val(fmMapLASettings.keybindA);
+    $(`#${scriptTag}_keybindB`).val(fmMapLASettings.keybindB);
+    $(`#${scriptTag}_maxDistance`).val(fmMapLASettings.maxDistance || 50);
+    
+    if(fmMapLASettings.barbTrainerEnabled) {
+        $(`#${scriptTag}_sidePanel`).addClass('visible');
+        setTimeout(updateSidePanelPosition, 100);
+    }
+}
+
+function getHTMLOptions(){
+    console.log("getting HTML options");
+    fmMapLASettings.smartTemplate = $(`#${scriptTag}_smartTemplate`).prop("checked");
+    fmMapLASettings.barbTrainerEnabled = $(`#${scriptTag}_barbTrainerToggle`).prop("checked");
+    fmMapLASettings.keybindA = ($(`#${scriptTag}_keybindA`).val() || fmMapLASettings.keybindA || 'Q').toUpperCase();
+    fmMapLASettings.keybindB = ($(`#${scriptTag}_keybindB`).val() || fmMapLASettings.keybindB || 'W').toUpperCase();
+}
+
+main();
