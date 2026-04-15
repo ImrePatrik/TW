@@ -130,6 +130,14 @@
     }
 
     // === TÁMOGATÁS-LISTÁZÓ KÓD + BOTVÉDELEM + SAJÁT FALU ÉRŐSÍTÉS INTEGRÁCIÓ ===
+    // VILÁG-specifikus URL generálás
+    const worldMatch = window.location.hostname.match(/hu(\d+)\.klanhaboru\.hu/);
+    if (!worldMatch) {
+        alert('❌ Nem klanhaboru.hu oldalon vagy!');
+        return;
+    }
+    const worldNum = worldMatch[1];
+    console.log(`🌍 Világ: hu${worldNum}.klanhaboru.hu`);
 
     const unitNames = [
         "Lándzsás", "Kardforgató", "Bárdos", "Íjász",
@@ -140,18 +148,24 @@
     // Saját név megszerzése
     const sajatNev = (typeof game_data === 'object') ? game_data.player.name : "Saját fiók";
 
-    const resp = await fetch('https://hu97.klanhaboru.hu/map/village.txt');
+    // Világ-specifikus map URL
+    const mapUrl = `https://hu${worldNum}.klanhaboru.hu/map/village.txt`;
+    console.log(`📥 Töltés: ${mapUrl}`);
+    
+    const resp = await fetch(mapUrl);
     const text = await resp.text();
-    const villages = text.trim().split('\n').map(row => {
+    const villages = text.trim().split('\\n').map(row => {
         const cols = row.split(',');
         if (cols.length < 4 || !cols[0] || !cols[1] || !cols[2] || !cols[3]) return null;
         return {
             id: cols[0],
-            name: decodeURIComponent(cols[1].replace(/\+/g, ' ')),
+            name: decodeURIComponent(cols[1].replace(/\\+/g, ' ')),
             x: cols[2],
             y: cols[3]
         };
     }).filter(Boolean);
+
+    console.log(`🏘️ Falvak: ${villages.length} db`);
 
     let modal = document.getElementById('tw_erosites_modal');
     if (modal) modal.remove();
@@ -190,7 +204,7 @@
     modal.style.boxShadow = '0 0 18px #00000020';
     modal.innerHTML = `
     <button id="tw_erosites_close" style="float:right; margin-bottom:10px;font-weight:bold;padding:8px 20px;background:#ffe38a;border:1px solid #ab7a28;border-radius:6px;">Bezárás</button>
-    <h2 style="text-align:center; margin-top:0; margin-bottom:16px; color:#7a5300; font-weight:bold; font-size:22px;">Teljes világ erősítések (${villages.length} falu, minden támogatás)</h2>
+    <h2 style="text-align:center; margin-top:0; margin-bottom:16px; color:#7a5300; font-weight:bold; font-size:22px;">🌍 hu${worldNum} - Teljes világ erősítések (${villages.length} falu, minden támogatás)</h2>
     <div style="font-size:13px;color:#555;text-align:center;margin-bottom:4px;">
         Szűrés fiókra: <b>${keresettFioKNorm ? keresettFioK : "nincs, minden játékos látszik"}</b>
     </div>
@@ -206,7 +220,7 @@
         color:#7a5300;
         z-index:10;
     ">
-        Készítette: Patika30
+        Készítette: Patika30 | Világ: hu${worldNum}
     </div>
     `;
     document.body.appendChild(overlay);
@@ -221,7 +235,8 @@
     let found = 0,
         done = 0;
     for (const v of villages) {
-        const url = `/game.php?village=${game_data.village.id}&screen=info_village&id=${v.id}`;
+        // Világ-specifikus info_village URL
+        const url = `https://hu${worldNum}.klanhaboru.hu/game.php?village=${game_data.village.id}&screen=info_village&id=${v.id}`;
         try {
             const resp = await fetch(url);
             const html = await resp.text();
@@ -249,7 +264,7 @@
                 }
 
                 const unitsRaw = Array.from(cells).slice(1, unitNames.length + 1).map(
-                    td => parseInt(td.textContent.replace(/\s/g, '').trim()) || 0
+                    td => parseInt(td.textContent.replace(/\\s/g, '').trim()) || 0
                 );
                 if (unitsRaw.every(n => n === 0)) return;
 
@@ -303,8 +318,10 @@
             progress.textContent = `Feldolgozva: ${done} / ${villages.length} falu; Támogatásokkal: ${found} db`;
             await new Promise(r => setTimeout(r, 350));
         } catch (err) {
-            progress.textContent = `Hiba a feldolgozásban: ${v.name} (${v.x}|${v.y})`;
+            console.error(`Hiba ${v.name}:`, err);
+            progress.textContent = `Hiba: ${v.name} (${v.x}|${v.y})`;
+            done++;
         }
     }
-    progress.textContent = `✅ Kész! Támogatással rendelkező falvak: ${found} db látható.`;
+    progress.textContent = `✅ Kész! Támogatással rendelkező falvak: ${found} db (${((found/villages.length)*100).toFixed(1)}%)`;
 })();
