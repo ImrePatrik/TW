@@ -1,0 +1,267 @@
+(function () {
+    if (window.TWColorPickerLoaded) {
+        const old = document.getElementById('bb_color_picker');
+        if (old) old.style.display = old.style.display === 'none' ? 'block' : 'none';
+        return;
+    }
+    window.TWColorPickerLoaded = true;
+
+    const baseColors = ['#ff0000', '#ffff00', '#00ff00', '#00ffff', '#0000ff', '#ff00ff'];
+    const grayScale = [134, 85, 46, 14, 0];
+
+    function hexToRgb(hex) {
+        hex = hex.replace('#', '');
+        return {
+            r: parseInt(hex.slice(0, 2), 16),
+            g: parseInt(hex.slice(2, 4), 16),
+            b: parseInt(hex.slice(4, 6), 16)
+        };
+    }
+
+    function rgbToHex(r, g, b) {
+        return '#' + [r, g, b].map(v => {
+            v = Math.max(0, Math.min(255, Math.round(v)));
+            return v.toString(16).padStart(2, '0');
+        }).join('');
+    }
+
+    function mix(c1, c2, amount) {
+        const a = hexToRgb(c1);
+        const b = hexToRgb(c2);
+        return rgbToHex(
+            a.r + (b.r - a.r) * amount,
+            a.g + (b.g - a.g) * amount,
+            a.b + (b.b - a.b) * amount
+        );
+    }
+
+    function getTextColor(hex) {
+        const { r, g, b } = hexToRgb(hex);
+        const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+        return yiq >= 128 ? '#000000' : '#ffffff';
+    }
+
+    function makeTone(base, row, col) {
+        if (col === 0) {
+            const g = grayScale[row];
+            return rgbToHex(g, g, g);
+        }
+
+        const targets = [
+            '#7a0000',
+            '#b44aa0',
+            '#cc33cc',
+            '#f04be7',
+            '#f7a7ef'
+        ];
+
+        if (col === 5) {
+            const whiteSteps = ['#d9d9d9', '#efefef', '#f6d6f6', '#efb6ef', '#e79be7'];
+            return whiteSteps[row];
+        }
+
+        const hueMap = {
+            1: '#996666',
+            2: '#cc66cc',
+            3: '#ff33ff',
+            4: '#ff80ff'
+        };
+
+        const dark = mix(hueMap[col] || base, '#000000', [0.15, 0.35, 0.55, 0.75, 0.9][row]);
+        const light = mix(dark, '#ffffff', [0.35, 0.2, 0.1, 0.05, 0][row]);
+        return light;
+    }
+
+    function injectStyle() {
+        if (document.getElementById('tw_color_picker_style')) return;
+
+        const style = document.createElement('style');
+        style.id = 'tw_color_picker_style';
+        style.textContent = `
+            #bb_color_picker {
+                position: fixed;
+                top: 180px;
+                right: 24px;
+                width: 128px;
+                background: #e7d5a6;
+                border: 1px solid #6b4a22;
+                z-index: 999999;
+                font-family: Verdana, Arial, sans-serif;
+                font-size: 12px;
+                color: #3b240f;
+            }
+            #bb_color_picker .tw_head {
+                background: linear-gradient(#c89b55, #b07a31);
+                border-bottom: 1px solid #6b4a22;
+                text-align: center;
+                font-weight: bold;
+                font-size: 18px;
+                line-height: 1.2;
+                padding: 4px 0;
+                color: #5a2e00;
+            }
+            #bb_color_picker .tw_close {
+                position: absolute;
+                top: 2px;
+                right: 4px;
+                text-decoration: none;
+                color: #4b2f12;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            #bb_color_picker_colors,
+            #bb_color_picker_tones {
+                display: grid;
+                grid-template-columns: repeat(6, 18px);
+                gap: 1px;
+                justify-content: center;
+                padding: 4px;
+                background: #f3e7c5;
+            }
+            #bb_color_picker_colors div,
+            #bb_color_picker_tones div {
+                width: 18px;
+                height: 18px;
+                border: 1px solid #5a3d1c;
+                box-sizing: border-box;
+                cursor: pointer;
+            }
+            #bb_color_picker_colors div:hover,
+            #bb_color_picker_tones div:hover {
+                border-color: #000;
+            }
+            #bb_color_picker_preview {
+                margin: 0 4px 4px;
+                padding: 3px;
+                text-align: center;
+                border: 1px solid #6b4a22;
+                background: #f6eed7;
+                color: #222;
+                font-size: 12px;
+            }
+            #bb_color_picker_tx {
+                width: 80px;
+                margin: 0 0 4px 4px;
+                border: 1px solid #6b4a22;
+                background: #fff8e8;
+                font-size: 12px;
+                padding: 2px 4px;
+                box-sizing: border-box;
+            }
+            #bb_color_picker_ok {
+                width: 34px;
+                margin-left: 2px;
+                border: 1px solid #6b4a22;
+                background: #d8c08e;
+                cursor: pointer;
+                font-size: 12px;
+                padding: 2px 0;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function createPicker() {
+        let picker = document.getElementById('bb_color_picker');
+        if (picker) return picker;
+
+        picker = document.createElement('div');
+        picker.id = 'bb_color_picker';
+        picker.innerHTML = `
+            <div class="tw_head">
+                <a href="#" class="tw_close">bezár</a>
+                bezár
+            </div>
+            <div id="bb_color_picker_colors"></div>
+            <div id="bb_color_picker_tones"></div>
+            <div id="bb_color_picker_preview">Szöveg</div>
+            <div style="padding-bottom:4px;">
+                <input type="text" id="bb_color_picker_tx" readonly>
+                <input type="button" value="OK" id="bb_color_picker_ok">
+            </div>
+        `;
+        document.body.appendChild(picker);
+        return picker;
+    }
+
+    function findTargetInput() {
+        const specific = document.querySelector('#message, textarea[name="message"], textarea');
+        if (specific) return specific;
+        const active = document.activeElement;
+        if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')) return active;
+        return null;
+    }
+
+    function insertColorTag(color) {
+        const target = findTargetInput();
+        if (!target) {
+            alert('Nem találtam szövegmezőt.');
+            return;
+        }
+
+        const openTag = `[color=${color}]`;
+        const closeTag = `[/color]`;
+
+        const start = target.selectionStart ?? target.value.length;
+        const end = target.selectionEnd ?? target.value.length;
+        const selected = target.value.slice(start, end);
+
+        const insert = openTag + (selected || 'Szöveg') + closeTag;
+        target.value = target.value.slice(0, start) + insert + target.value.slice(end);
+        target.focus();
+
+        const newPos = start + insert.length;
+        if (target.setSelectionRange) target.setSelectionRange(newPos, newPos);
+
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        target.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    injectStyle();
+    const picker = createPicker();
+    const colorsWrap = document.getElementById('bb_color_picker_colors');
+    const tonesWrap = document.getElementById('bb_color_picker_tones');
+    const preview = document.getElementById('bb_color_picker_preview');
+    const input = document.getElementById('bb_color_picker_tx');
+    const okBtn = document.getElementById('bb_color_picker_ok');
+    const closeBtn = picker.querySelector('.tw_close');
+
+    let selectedColor = '#ff0000';
+
+    function setSelected(color) {
+        selectedColor = color;
+        preview.style.backgroundColor = color;
+        preview.style.color = getTextColor(color);
+        input.value = color;
+    }
+
+    baseColors.forEach((color) => {
+        const cell = document.createElement('div');
+        cell.style.backgroundColor = color;
+        cell.title = color;
+        cell.addEventListener('click', () => setSelected(color));
+        colorsWrap.appendChild(cell);
+    });
+
+    for (let row = 0; row < 5; row++) {
+        for (let col = 0; col < 6; col++) {
+            const tone = makeTone(baseColors[Math.min(col, baseColors.length - 1)], row, col);
+            const cell = document.createElement('div');
+            cell.style.backgroundColor = tone;
+            cell.title = tone;
+            cell.addEventListener('click', () => setSelected(tone));
+            tonesWrap.appendChild(cell);
+        }
+    }
+
+    okBtn.addEventListener('click', function () {
+        insertColorTag(selectedColor);
+    });
+
+    closeBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        picker.style.display = 'none';
+    });
+
+    setSelected('#ff0000');
+})();
