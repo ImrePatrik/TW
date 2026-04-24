@@ -16,7 +16,11 @@ const NorbiFarmEngine = {
     botDetectionTimer: null,
     settings: {
         loopInterval: 10, // minutes
-        randomDelayRange: 3 // ±X minutes
+        randomDelayRange: 3, // ±X minutes
+        discordWebhookUrl: '', // Discord webhook URL
+        telegramBotToken: '', // Telegram bot token
+        telegramChatId: '', // Telegram chat ID
+        notificationsEnabled: true // Enable/disable notifications
     },
     
     init: function() {
@@ -98,6 +102,47 @@ const NorbiFarmEngine = {
                     '</tr>' +
                 '</table>' +
                 
+                // Notifications Panel
+                '<table class="vis" style="width: 100%; margin-bottom: 15px;">' +
+                    '<tr><th colspan="2" style="background: #c1a264; text-align: center;">Bot Protection Alerts</th></tr>' +
+                    '<tr>' +
+                        '<td style="font-weight: bold; vertical-align: middle;">Notifications:</td>' +
+                        '<td>' +
+                            '<label style="display: flex; align-items: center; font-weight: bold;">' +
+                                '<input type="checkbox" id="enable-notifications" style="margin-right: 8px;"> Enable Notifications' +
+                            '</label>' +
+                        '</td>' +
+                    '</tr>' +
+                    '<tr>' +
+                        '<td style="font-weight: bold; vertical-align: middle;">Discord Webhook:</td>' +
+                        '<td>' +
+                            '<input id="discord-webhook" type="text" placeholder="https://discord.com/api/webhooks/..." style="width: 100%; padding: 4px; border: 1px solid #603000; font-family: Verdana, Arial; font-size: 10px;">' +
+                        '</td>' +
+                    '</tr>' +
+                    '<tr>' +
+                        '<td style="font-weight: bold; vertical-align: middle;">Telegram Token:</td>' +
+                        '<td>' +
+                            '<input id="telegram-token" type="text" placeholder="123456:ABC-DEF1234..." style="width: 100%; padding: 4px; border: 1px solid #603000; font-family: Verdana, Arial; font-size: 10px;">' +
+                        '</td>' +
+                    '</tr>' +
+                    '<tr>' +
+                        '<td style="font-weight: bold; vertical-align: middle;">Telegram Chat ID:</td>' +
+                        '<td>' +
+                            '<input id="telegram-chat-id" type="text" placeholder="123456789 or @username" style="width: 100%; padding: 4px; border: 1px solid #603000; font-family: Verdana, Arial; font-size: 10px;">' +
+                            '<div style="font-size: 9px; color: #666; margin-top: 2px;">Will send 15 aggressive notifications!</div>' +
+                        '</td>' +
+                    '</tr>' +
+                    '<tr>' +
+                        '<td style="font-weight: bold; vertical-align: middle;">Test Notifications:</td>' +
+                        '<td>' +
+                            '<div style="display: flex; gap: 4px; margin-top: 4px;">' +
+                                '<input id="test-discord-btn" class="btn btn-default" type="button" value="Test Discord" style="flex: 1; padding: 4px 8px; font-size: 10px !important;">' +
+                                '<input id="test-telegram-btn" class="btn btn-default" type="button" value="Test Telegram" style="flex: 1; padding: 4px 8px; font-size: 10px !important;">' +
+                            '</div>' +
+                        '</td>' +
+                    '</tr>' +
+                '</table>' +
+                
                 // Control Buttons
                 '<div style="margin-bottom: 15px;">' +
                     '<div style="display: flex; gap: 8px; margin-bottom: 8px;">' +
@@ -146,6 +191,15 @@ const NorbiFarmEngine = {
         
         document.getElementById('enable-loop').addEventListener('change', function() {
             self.updateLoopStatus();
+        });
+        
+        // Test button event handlers
+        document.getElementById('test-discord-btn').addEventListener('click', function() {
+            self.testDiscordNotification();
+        });
+        
+        document.getElementById('test-telegram-btn').addEventListener('click', function() {
+            self.testTelegramNotification();
         });
         
         // Add input validation for number fields
@@ -624,6 +678,10 @@ const NorbiFarmEngine = {
                 document.getElementById('loop-interval').value = this.settings.loopInterval;
                 document.getElementById('random-delay').value = this.settings.randomDelayRange;
                 document.getElementById('enable-loop').checked = this.loopEnabled;
+                document.getElementById('enable-notifications').checked = this.settings.notificationsEnabled;
+                document.getElementById('discord-webhook').value = this.settings.discordWebhookUrl;
+                document.getElementById('telegram-token').value = this.settings.telegramBotToken;
+                document.getElementById('telegram-chat-id').value = this.settings.telegramChatId;
             }
         } catch (error) {
             console.error('Failed to load settings:', error);
@@ -635,6 +693,10 @@ const NorbiFarmEngine = {
             // Get values from UI
             this.settings.loopInterval = parseInt(document.getElementById('loop-interval').value);
             this.settings.randomDelayRange = parseInt(document.getElementById('random-delay').value);
+            this.settings.notificationsEnabled = document.getElementById('enable-notifications').checked;
+            this.settings.discordWebhookUrl = document.getElementById('discord-webhook').value.trim();
+            this.settings.telegramBotToken = document.getElementById('telegram-token').value.trim();
+            this.settings.telegramChatId = document.getElementById('telegram-chat-id').value.trim();
             
             // Validate input values
             if (isNaN(this.settings.loopInterval) || this.settings.loopInterval < 1) {
@@ -659,6 +721,9 @@ const NorbiFarmEngine = {
                 (this.settings.loopInterval - this.settings.randomDelayRange) + '-' + 
                 (this.settings.loopInterval + this.settings.randomDelayRange) + ' min)');
             this.log('Loop Mode: ' + (this.loopEnabled ? 'Enabled' : 'Disabled'));
+            this.log('Notifications: ' + (this.settings.notificationsEnabled ? 'Enabled' : 'Disabled'));
+            this.log('Discord Webhook: ' + (this.settings.discordWebhookUrl ? 'Configured' : 'Not configured'));
+            this.log('Telegram Bot: ' + (this.settings.telegramBotToken && this.settings.telegramChatId ? 'Configured' : 'Not configured'));
             
             this.updateLoopStatus();
             
@@ -707,11 +772,50 @@ const NorbiFarmEngine = {
     
     checkBotProtection: function() {
         try {
-            // Check for bot protection element on current page
+            // Check for bot protection element on current page (original method)
             var botElement = document.getElementById('botprotection_quest');
             
-            if (botElement) {
+            // Enhanced detection for Hungarian bot protection elements
+            var botProtectionRow = document.querySelector('.bot-protection-row');
+            var captchaElement = document.querySelector('.captcha');
+            var botVedelemText = document.body.textContent.indexOf('Bot védelem') !== -1;
+            
+            // Check if any bot protection is detected
+            if (botElement || botProtectionRow || captchaElement || botVedelemText) {
+                var detectionMethod = '';
+                if (botElement) detectionMethod += 'botprotection_quest ';
+                if (botProtectionRow) detectionMethod += '.bot-protection-row ';
+                if (captchaElement) detectionMethod += '.captcha ';
+                if (botVedelemText) detectionMethod += '"Bot védelem" text ';
+                
                 this.log('=== BOT PROTECTION DETECTED ===');
+                this.log('Detection method(s): ' + detectionMethod.trim());
+                
+                // Send notifications immediately
+                var notificationMessage = this.loopEnabled ? 
+                    'Bot protection detected! Loop mode stopped for safety' :
+                    'Bot protection detected on page (loop mode already disabled)';
+                
+                var notificationsSent = [];
+                
+                // Try Discord notification
+                this.sendDiscordNotification(notificationMessage, detectionMethod.trim());
+                if (this.settings.notificationsEnabled && this.settings.discordWebhookUrl) {
+                    notificationsSent.push('Discord');
+                }
+                
+                // Try Telegram notification
+                this.sendTelegramNotification(notificationMessage, detectionMethod.trim());
+                if (this.settings.notificationsEnabled && this.settings.telegramBotToken && this.settings.telegramChatId) {
+                    notificationsSent.push('Telegram');
+                }
+                
+                // Log which notifications were sent
+                if (notificationsSent.length > 0) {
+                    this.log('🔔 Notifications sent via: ' + notificationsSent.join(' and '));
+                } else {
+                    this.log('🔔 No notification channels configured or enabled');
+                }
                 
                 if (this.loopEnabled) {
                     // Loop mode is ON - stop it for safety
@@ -813,12 +917,280 @@ const NorbiFarmEngine = {
         console.log('[Norbi Farm] ' + message);
     },
     
+    // Notification System
+    sendDiscordNotification: function(message, detectionMethods) {
+        if (!this.settings.notificationsEnabled) {
+            console.log('Notifications disabled, skipping Discord notification');
+            return;
+        }
+        if (!this.settings.discordWebhookUrl) {
+            console.log('Discord webhook not configured, skipping Discord notification');
+            return;
+        }
+        
+        var embed = {
+            title: "🚨 BOT PROTECTION DETECTED",
+            description: message,
+            color: 15158332, // Red color
+            fields: [
+                {
+                    name: "🎯 Detection Methods",
+                    value: detectionMethods,
+                    inline: true
+                },
+                {
+                    name: "🏰 Village",
+                    value: game_data.village.id.toString(),
+                    inline: true
+                },
+                {
+                    name: "⏰ Time",
+                    value: new Date().toLocaleString(),
+                    inline: true
+                }
+            ],
+            footer: {
+                text: "Norbi0N Farm Engine v2.0"
+            }
+        };
+        
+        var payload = {
+            embeds: [embed]
+        };
+        
+        fetch(this.settings.discordWebhookUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        }).then(function(response) {
+            if (response.ok) {
+                console.log('Discord notification sent successfully');
+            } else {
+                console.error('Failed to send Discord notification:', response.status);
+            }
+        }).catch(function(error) {
+            console.error('Discord notification error:', error);
+        });
+    },
+    
+    sendTelegramNotification: function(message, detectionMethods) {
+        if (!this.settings.notificationsEnabled) {
+            console.log('Notifications disabled, skipping Telegram notification');
+            return;
+        }
+        if (!this.settings.telegramBotToken || !this.settings.telegramChatId) {
+            console.log('Telegram not configured, skipping Telegram notification');
+            return;
+        }
+        
+        var telegramMessage = "🚨 *BOT PROTECTION DETECTED* 🚨\n\n" +
+            "💥 " + message + "\n\n" +
+            "🎯 *Detection:* " + detectionMethods + "\n" +
+            "🏰 *Village:* " + game_data.village.id + "\n" +
+            "⏰ *Time:* " + new Date().toLocaleString() + "\n\n" +
+            "⚠️ Loop mode has been disabled for safety!";
+        
+        var url = 'https://api.telegram.org/bot' + this.settings.telegramBotToken + '/sendMessage';
+        
+        var payload = {
+            chat_id: this.settings.telegramChatId,
+            text: telegramMessage,
+            parse_mode: 'Markdown'
+        };
+        
+        // Send 15 aggressive notifications as requested
+        for (var i = 1; i <= 15; i++) {
+            (function(msgNumber) {
+                setTimeout(function() {
+                    var aggressivePayload = Object.assign({}, payload, {
+                        text: "🚨 ALERT #" + msgNumber + "/15 🚨\n\n" + telegramMessage
+                    });
+                    
+                    fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(aggressivePayload)
+                    }).then(function(response) {
+                        if (response.ok) {
+                            console.log('Telegram notification #' + msgNumber + ' sent successfully');
+                        } else {
+                            console.error('Failed to send Telegram notification #' + msgNumber + ':', response.status);
+                        }
+                    }).catch(function(error) {
+                        console.error('Telegram notification #' + msgNumber + ' error:', error);
+                    });
+                }, (msgNumber - 1) * 500); // 500ms delay between messages
+            })(i);
+        }
+    },
+    
+    // Test Notification Functions
+    testDiscordNotification: function() {
+        var discordUrl = document.getElementById('discord-webhook').value.trim();
+        var notificationsEnabled = document.getElementById('enable-notifications').checked;
+        
+        if (!notificationsEnabled) {
+            this.log('⚠️ Notifications are disabled! Enable them first.');
+            return;
+        }
+        
+        if (!discordUrl) {
+            this.log('⚠️ Discord webhook URL not configured!');
+            return;
+        }
+        
+        this.log('🧪 Sending Discord test notification...');
+        
+        var embed = {
+            title: "🧪 DISCORD TEST NOTIFICATION",
+            description: "This is a test notification from your Norbi0N Farm Engine!",
+            color: 3447003, // Blue color for test
+            fields: [
+                {
+                    name: "✅ Status",
+                    value: "Test Successful",
+                    inline: true
+                },
+                {
+                    name: "🏰 Village",
+                    value: game_data.village.id.toString(),
+                    inline: true
+                },
+                {
+                    name: "⏰ Time",
+                    value: new Date().toLocaleString(),
+                    inline: true
+                }
+            ],
+            footer: {
+                text: "Norbi0N Farm Engine v2.0 [TEST MODE]"
+            }
+        };
+        
+        var payload = {
+            embeds: [embed]
+        };
+        
+        var self = this;
+        fetch(discordUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        }).then(function(response) {
+            if (response.ok) {
+                self.log('✅ Discord test notification sent successfully!');
+            } else {
+                self.log('❌ Discord test failed: HTTP ' + response.status);
+            }
+        }).catch(function(error) {
+            self.log('❌ Discord test error: ' + error.message);
+        });
+    },
+    
+    testTelegramNotification: function() {
+        var telegramToken = document.getElementById('telegram-token').value.trim();
+        var telegramChatId = document.getElementById('telegram-chat-id').value.trim();
+        var notificationsEnabled = document.getElementById('enable-notifications').checked;
+        
+        if (!notificationsEnabled) {
+            this.log('⚠️ Notifications are disabled! Enable them first.');
+            return;
+        }
+        
+        if (!telegramToken || !telegramChatId) {
+            this.log('⚠️ Telegram token or chat ID not configured!');
+            return;
+        }
+        
+        this.log('🧪 Sending Telegram test notification (3 messages)...');
+        
+        var telegramMessage = "🧪 *TELEGRAM TEST NOTIFICATION* 🧪\n\n" +
+            "✅ This is a test notification from your Norbi0N Farm Engine!\n\n" +
+            "🏰 *Village:* " + game_data.village.id + "\n" +
+            "⏰ *Time:* " + new Date().toLocaleString() + "\n\n" +
+            "🔥 Test successful!";
+        
+        var url = 'https://api.telegram.org/bot' + telegramToken + '/sendMessage';
+        
+        var payload = {
+            chat_id: telegramChatId,
+            text: telegramMessage,
+            parse_mode: 'Markdown'
+        };
+        
+        var self = this;
+        // Send 3 test messages instead of 15 for testing
+        for (var i = 1; i <= 3; i++) {
+            (function(msgNumber) {
+                setTimeout(function() {
+                    var testPayload = {
+                        chat_id: telegramChatId,
+                        text: "🧪 TEST MESSAGE #" + msgNumber + "/3 🧪\n\n" + telegramMessage,
+                        parse_mode: 'Markdown'
+                    };
+                    
+                    fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(testPayload)
+                    }).then(function(response) {
+                        if (response.ok) {
+                            self.log('✅ Telegram test message #' + msgNumber + ' sent successfully!');
+                        } else {
+                            self.log('❌ Telegram test #' + msgNumber + ' failed: HTTP ' + response.status);
+                        }
+                    }).catch(function(error) {
+                        self.log('❌ Telegram test #' + msgNumber + ' error: ' + error.message);
+                    });
+                }, (msgNumber - 1) * 1000); // 1 second delay between test messages
+            })(i);
+        }
+    },
+    
     setupMessageListener: function() {
         var self = this;
         // Listen for messages from farm tab
         window.addEventListener('message', function(event) {
             if (event.data && event.data.source === 'norbi_farm_tab') {
                 self.log('Message from farm tab: ' + event.data.message);
+            }
+            
+            // Listen for bot protection messages from farm tab
+            if (event.data && event.data.source === 'norbi_farm_bot_detection') {
+                self.log('=== BOT PROTECTION DETECTED IN FARM TAB ===');
+                self.log('Message: ' + event.data.message);
+                self.log('Detection method: ' + event.data.detectionMethod);
+                self.log('Total presses: ' + event.data.totalPresses);
+                
+                // Send notifications via Discord and Telegram
+                var notificationsSent = [];
+                
+                // Try Discord notification
+                self.sendDiscordNotification(event.data.message, event.data.detectionMethod);
+                if (self.settings.notificationsEnabled && self.settings.discordWebhookUrl) {
+                    notificationsSent.push('Discord');
+                }
+                
+                // Try Telegram notification
+                self.sendTelegramNotification(event.data.message, event.data.detectionMethod);
+                if (self.settings.notificationsEnabled && self.settings.telegramBotToken && self.settings.telegramChatId) {
+                    notificationsSent.push('Telegram');
+                }
+                
+                // Log which notifications were sent
+                if (notificationsSent.length > 0) {
+                    self.log('🔔 Farm tab notifications sent via: ' + notificationsSent.join(' and '));
+                } else {
+                    self.log('🔔 No notification channels configured for farm tab alerts');
+                }
             }
         });
     }
@@ -832,6 +1204,7 @@ const NorbiFarmTabHandler = {
     command: null,
     pressTimer: null,
     progressTimer: null,
+    botDetectionTimer: null,
     totalPresses: 0,
     isRunning: false,
     
@@ -969,7 +1342,12 @@ const NorbiFarmTabHandler = {
             self.monitorProgress();
         }, 100); // Check every 100ms like Helper.js
         
-        console.log('Continuous farming started');
+        // Start bot protection monitoring (80ms like original injection)
+        this.botDetectionTimer = setInterval(function() {
+            self.checkBotProtection();
+        }, 80);
+        
+        console.log('Continuous farming started with bot protection monitoring');
     },
     
     pressEnter: function() {
@@ -1123,6 +1501,11 @@ const NorbiFarmTabHandler = {
             this.progressTimer = null;
         }
         
+        if (this.botDetectionTimer) {
+            clearInterval(this.botDetectionTimer);
+            this.botDetectionTimer = null;
+        }
+        
         console.log('Stopped farming. Total Enter presses: ' + this.totalPresses);
     },
     
@@ -1144,6 +1527,49 @@ const NorbiFarmTabHandler = {
         
         localStorage.setItem('norbi_farm_result', JSON.stringify(result));
         console.log('Result reported to engine');
+    },
+    
+    // Bot Protection Detection with Communication to Engine
+    checkBotProtection: function() {
+        if (!this.isRunning) return;
+        
+        try {
+            // Check for bot protection element (original detection method)
+            var botElement = document.getElementById('botprotection_quest');
+            
+            if (botElement) {
+                console.log('BOT PROTECTION DETECTED in farm tab! Stopping farming and notifying engine...');
+                
+                // Send message to engine tab for notifications
+                try {
+                    window.opener.postMessage({
+                        source: 'norbi_farm_bot_detection',
+                        message: 'Bot protection detected during active farming! Farming stopped immediately for safety.',
+                        detectionMethod: 'botprotection_quest',
+                        totalPresses: this.totalPresses,
+                        timestamp: Date.now()
+                    }, '*');
+                    console.log('Notification message sent to engine tab');
+                } catch (error) {
+                    console.error('Failed to send message to engine tab:', error);
+                }
+                
+                // Stop farming immediately
+                this.stopFarming();
+                
+                // Report bot protection detection via localStorage (existing method)
+                this.reportResult('error', 'Bot protection detected - farming stopped for safety', {
+                    totalPresses: this.totalPresses,
+                    error: 'Bot protection quest appeared'
+                });
+                
+                return true; // Bot protection detected
+            }
+        } catch (error) {
+            console.error('Error checking bot protection:', error);
+        }
+        
+        return false; // No bot protection detected
     }
 };
 
