@@ -9475,4 +9475,4 @@ FAL	MIN
 2	32 kl	6kl+10íló
 */
 
-void(0)
+void(0);
