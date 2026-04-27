@@ -8,28 +8,74 @@
         const oldStyle = document.getElementById('tw_color_picker_style');
         if (oldStyle) oldStyle.remove();
 
-        const baseColors = ['#ff0000', '#ffff00', '#00ff00', '#00ffff', '#0000ff', '#ff00ff'];
-        const toneGrid = [
-            '#868686', '#ae8686', '#d68686', '#ff8686', '#ffdbdb', '#ffffff',
-            '#555555', '#8d5555', '#c65555', '#ff5555', '#ffaaaa', '#ffffff',
-            '#2e2e2e', '#742e2e', '#b92e2e', '#ff2e2e', '#ff8383', '#ffd8d8',
-            '#0e0e0e', '#5e0e0e', '#ae0e0e', '#ff0e0e', '#ff6363', '#ffb8b8',
-            '#000000', '#4b0000', '#a50000', '#ff0000', '#ff4747', '#ff9c9c'
-        ];
+        function clamp(v, min, max) {
+            return Math.max(min, Math.min(max, v));
+        }
 
-        function hexToRgb(hex) {
-            if (!hex) return { r: 0, g: 0, b: 0 };
-            const clean = hex.replace('#', '');
+        function hsvToRgb(h, s, v) {
+            let r = 0, g = 0, b = 0;
+            const i = Math.floor(h * 6);
+            const f = h * 6 - i;
+            const p = v * (1 - s);
+            const q = v * (1 - f * s);
+            const t = v * (1 - (1 - f) * s);
+
+            switch (i % 6) {
+                case 0: r = v; g = t; b = p; break;
+                case 1: r = q; g = v; b = p; break;
+                case 2: r = p; g = v; b = t; break;
+                case 3: r = p; g = q; b = v; break;
+                case 4: r = t; g = p; b = v; break;
+                case 5: r = v; g = p; b = q; break;
+            }
+
             return {
-                r: parseInt(clean.slice(0, 2), 16) || 0,
-                g: parseInt(clean.slice(2, 4), 16) || 0,
-                b: parseInt(clean.slice(4, 6), 16) || 0
+                r: Math.round(r * 255),
+                g: Math.round(g * 255),
+                b: Math.round(b * 255)
             };
         }
 
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+        }
+
+        function hexToRgb(hex) {
+            const clean = hex.replace('#', '').trim();
+            if (!/^[0-9a-fA-F]{6}$/.test(clean)) return null;
+            return {
+                r: parseInt(clean.slice(0, 2), 16),
+                g: parseInt(clean.slice(2, 4), 16),
+                b: parseInt(clean.slice(4, 6), 16)
+            };
+        }
+
+        function rgbToHsv(r, g, b) {
+            r /= 255;
+            g /= 255;
+            b /= 255;
+
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            const d = max - min;
+            let h = 0;
+            const s = max === 0 ? 0 : d / max;
+            const v = max;
+
+            if (d !== 0) {
+                switch (max) {
+                    case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+                    case g: h = ((b - r) / d + 2) / 6; break;
+                    case b: h = ((r - g) / d + 4) / 6; break;
+                }
+            }
+
+            return { h, s, v };
+        }
+
         function getTextColor(hex) {
-            const { r, g, b } = hexToRgb(hex);
-            const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+            const rgb = hexToRgb(hex);
+            if (!rgb) return '#000000';
+            const yiq = ((rgb.r * 299) + (rgb.g * 587) + (rgb.b * 114)) / 1000;
             return yiq >= 128 ? '#000000' : '#ffffff';
         }
 
@@ -49,7 +95,11 @@
             }
 
             const active = document.activeElement;
-            if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT') && typeof active.value === 'string') {
+            if (
+                active &&
+                (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT') &&
+                typeof active.value === 'string'
+            ) {
                 return active;
             }
 
@@ -58,13 +108,15 @@
 
         function insertColorTag(color) {
             const target = findTargetInput();
+
             if (!target) {
                 alert('Nem találtam szövegmezőt. Kattints előbb a jegyzet mezőbe.');
                 return;
             }
 
-            const openTag = '[color=' + color + ']';
-            const closeTag = '[/color]';
+            const openTag = `[color=${color}]`;
+            const closeTag = `[/color]`;
+
             const start = typeof target.selectionStart === 'number' ? target.selectionStart : target.value.length;
             const end = typeof target.selectionEnd === 'number' ? target.selectionEnd : target.value.length;
             const selected = target.value.slice(start, end) || 'Szöveg';
@@ -87,9 +139,9 @@
         style.textContent = `
             #bb_color_picker {
                 position: fixed;
-                top: 190px;
+                top: 180px;
                 right: 24px;
-                width: 128px;
+                width: 200px;
                 background: #e7d5a6;
                 border: 1px solid #6b4a22;
                 z-index: 999999;
@@ -97,23 +149,27 @@
                 font-size: 12px;
                 color: #3b240f;
                 box-sizing: border-box;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.15);
             }
+
             #bb_color_picker * {
                 box-sizing: border-box;
             }
+
             #bb_color_picker_header {
                 position: relative;
                 background: linear-gradient(#c89b55, #b07a31);
                 border-bottom: 1px solid #6b4a22;
                 text-align: center;
                 font-weight: bold;
-                font-size: 18px;
+                font-size: 16px;
                 line-height: 1.2;
                 padding: 4px 18px 4px 6px;
                 color: #5a2e00;
                 cursor: move;
                 user-select: none;
             }
+
             #bb_color_picker_close {
                 position: absolute;
                 top: 2px;
@@ -124,49 +180,85 @@
                 font-weight: bold;
                 cursor: pointer;
             }
+
             #bb_color_picker_body {
-                padding: 4px;
+                padding: 6px;
                 background: #f3e7c5;
             }
-            #bb_color_picker_colors,
-            #bb_color_picker_tones {
-                display: grid;
-                grid-template-columns: repeat(6, 18px);
-                grid-auto-rows: 18px;
-                gap: 1px;
-                justify-content: center;
-                margin: 0 auto 4px auto;
-                width: calc(6 * 18px + 5 * 1px);
+
+            #tw_sv_box {
+                position: relative;
+                width: 100%;
+                height: 120px;
+                cursor: crosshair;
+                border: 1px solid #6b4a22;
+                margin-bottom: 6px;
+                background:
+                    linear-gradient(to top, #000 0%, transparent 100%),
+                    linear-gradient(to right, #fff 0%, rgba(255,255,255,0) 100%),
+                    red;
             }
-            #bb_color_picker_colors div,
-            #bb_color_picker_tones div {
-                width: 18px;
+
+            #tw_sv_cursor {
+                position: absolute;
+                width: 10px;
+                height: 10px;
+                border: 1px solid #fff;
+                border-radius: 50%;
+                box-shadow: 0 0 0 1px #000;
+                pointer-events: none;
+                transform: translate(-5px, -5px);
+            }
+
+            #tw_hue {
+                width: 100%;
+                margin: 0 0 6px 0;
+                appearance: none;
+                height: 12px;
+                border: 1px solid #6b4a22;
+                background: linear-gradient(to right,
+                    rgb(255,0,0) 0%,
+                    rgb(255,255,0) 17%,
+                    rgb(0,255,0) 33%,
+                    rgb(0,255,255) 50%,
+                    rgb(0,0,255) 67%,
+                    rgb(255,0,255) 83%,
+                    rgb(255,0,0) 100%
+                );
+                outline: none;
+            }
+
+            #tw_hue::-webkit-slider-thumb {
+                appearance: none;
+                width: 10px;
                 height: 18px;
-                border: 1px solid #5a3d1c;
+                border: 1px solid #4a2d12;
+                background: #f6eed7;
                 cursor: pointer;
             }
-            #bb_color_picker_colors div:hover,
-            #bb_color_picker_tones div:hover {
-                border-color: #000;
+
+            #tw_hue::-moz-range-thumb {
+                width: 10px;
+                height: 18px;
+                border: 1px solid #4a2d12;
+                background: #f6eed7;
+                cursor: pointer;
+                border-radius: 0;
             }
+
             #bb_color_picker_preview {
                 width: 100%;
-                margin: 0 0 4px 0;
-                padding: 3px;
+                height: 24px;
+                margin-bottom: 4px;
                 text-align: center;
                 border: 1px solid #6b4a22;
-                background: #f6eed7;
-                color: #222;
+                background: #ff0000;
+                color: #fff;
                 font-size: 12px;
-                min-height: 22px;
-                line-height: 14px;
+                line-height: 22px;
+                font-weight: bold;
             }
-            #bb_color_picker_bottom {
-                display: grid;
-                grid-template-columns: 1fr 34px;
-                gap: 2px;
-                align-items: center;
-            }
+
             #bb_color_picker_tx {
                 width: 100%;
                 border: 1px solid #6b4a22;
@@ -174,9 +266,11 @@
                 font-size: 12px;
                 padding: 2px 4px;
                 height: 24px;
+                margin-bottom: 4px;
             }
+
             #bb_color_picker_ok {
-                width: 34px;
+                width: 100%;
                 height: 24px;
                 border: 1px solid #6b4a22;
                 background: #d8c08e;
@@ -184,77 +278,121 @@
                 font-size: 12px;
                 padding: 0;
             }
+
             #bb_color_picker_ok:hover {
                 background: #cdb57f;
             }
         `;
-        if (document.head) {
-            document.head.appendChild(style);
-        }
+        if (document.head) document.head.appendChild(style);
 
         const picker = document.createElement('div');
         picker.id = 'bb_color_picker';
         picker.innerHTML = `
             <div id="bb_color_picker_header">
-                bezár
+                szín
                 <a href="#" id="bb_color_picker_close">x</a>
             </div>
             <div id="bb_color_picker_body">
-                <div id="bb_color_picker_colors"></div>
-                <div id="bb_color_picker_tones"></div>
-                <div id="bb_color_picker_preview">Szöveg</div>
-                <div id="bb_color_picker_bottom">
-                    <input type="text" id="bb_color_picker_tx" readonly>
-                    <input type="button" value="OK" id="bb_color_picker_ok">
+                <div id="tw_sv_box">
+                    <div id="tw_sv_cursor"></div>
                 </div>
+                <input type="range" min="0" max="360" value="0" id="tw_hue">
+                <div id="bb_color_picker_preview">Szöveg</div>
+                <input type="text" id="bb_color_picker_tx" value="#ff0000">
+                <input type="button" value="OK" id="bb_color_picker_ok">
             </div>
         `;
-        if (document.body) {
-            document.body.appendChild(picker);
-        } else {
-            return;
-        }
+        if (!document.body) return;
+        document.body.appendChild(picker);
 
-        const colorsWrap = picker.querySelector('#bb_color_picker_colors');
-        const tonesWrap = picker.querySelector('#bb_color_picker_tones');
+        const svBox = picker.querySelector('#tw_sv_box');
+        const svCursor = picker.querySelector('#tw_sv_cursor');
+        const hueInput = picker.querySelector('#tw_hue');
         const preview = picker.querySelector('#bb_color_picker_preview');
-        const input = picker.querySelector('#bb_color_picker_tx');
+        const hexInput = picker.querySelector('#bb_color_picker_tx');
         const okBtn = picker.querySelector('#bb_color_picker_ok');
         const closeBtn = picker.querySelector('#bb_color_picker_close');
         const header = picker.querySelector('#bb_color_picker_header');
 
-        if (!colorsWrap || !tonesWrap || !preview || !input || !okBtn || !closeBtn || !header) {
-            console.error('TW Color Picker: hiányzó DOM elem.');
+        if (!svBox || !svCursor || !hueInput || !preview || !hexInput || !okBtn || !closeBtn || !header) {
+            console.error('TW 2D color picker: hiányzó DOM elem.');
             return;
         }
 
+        let hue = 0;
+        let sat = 1;
+        let val = 1;
         let selectedColor = '#ff0000';
 
-        function setSelected(color) {
-            selectedColor = color;
-            preview.style.backgroundColor = color;
-            preview.style.color = getTextColor(color);
-            input.value = color;
+        function updateUI() {
+            const pureHue = hsvToRgb(hue / 360, 1, 1);
+            const hueHex = rgbToHex(pureHue.r, pureHue.g, pureHue.b);
+
+            svBox.style.background = `
+                linear-gradient(to top, #000 0%, transparent 100%),
+                linear-gradient(to right, #fff 0%, rgba(255,255,255,0) 100%),
+                ${hueHex}
+            `;
+
+            const rgb = hsvToRgb(hue / 360, sat, val);
+            selectedColor = rgbToHex(rgb.r, rgb.g, rgb.b);
+
+            preview.style.backgroundColor = selectedColor;
+            preview.style.color = getTextColor(selectedColor);
+            hexInput.value = selectedColor;
+
+            const x = sat * svBox.clientWidth;
+            const y = (1 - val) * svBox.clientHeight;
+            svCursor.style.left = `${x}px`;
+            svCursor.style.top = `${y}px`;
         }
 
-        baseColors.forEach((color) => {
-            const cell = document.createElement('div');
-            cell.style.backgroundColor = color;
-            cell.title = color;
-            cell.addEventListener('click', function () {
-                setSelected(color);
-            });
-            colorsWrap.appendChild(cell);
+        function updateFromBox(clientX, clientY) {
+            const rect = svBox.getBoundingClientRect();
+            const x = clamp(clientX - rect.left, 0, rect.width);
+            const y = clamp(clientY - rect.top, 0, rect.height);
+
+            sat = x / rect.width;
+            val = 1 - (y / rect.height);
+
+            updateUI();
+        }
+
+        hueInput.addEventListener('input', function () {
+            hue = parseInt(this.value, 10) || 0;
+            updateUI();
         });
 
-        toneGrid.forEach((color) => {
-            const cell = document.createElement('div');
-            cell.style.backgroundColor = color;
-            cell.title = color;
-            cell.addEventListener('click', function () {
-                setSelected(color);
-            });
-            tonesWrap.appendChild(cell);
+        let draggingBox = false;
+
+        svBox.addEventListener('mousedown', function (e) {
+            draggingBox = true;
+            updateFromBox(e.clientX, e.clientY);
+        });
+
+        document.addEventListener('mousemove', function (e) {
+            if (draggingBox) {
+                updateFromBox(e.clientX, e.clientY);
+            }
+        });
+
+        document.addEventListener('mouseup', function () {
+            draggingBox = false;
+        });
+
+        hexInput.addEventListener('change', function () {
+            const rgb = hexToRgb(this.value);
+            if (!rgb) {
+                this.value = selectedColor;
+                return;
+            }
+
+            const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+            hue = Math.round(hsv.h * 360);
+            sat = hsv.s;
+            val = hsv.v;
+            hueInput.value = hue;
+            updateUI();
         });
 
         okBtn.addEventListener('click', function () {
@@ -266,12 +404,13 @@
             picker.style.display = 'none';
         });
 
-        let dragging = false;
+        let draggingWindow = false;
         let offsetX = 0;
         let offsetY = 0;
 
         header.addEventListener('mousedown', function (e) {
-            dragging = true;
+            if (e.target === closeBtn) return;
+            draggingWindow = true;
             const rect = picker.getBoundingClientRect();
             offsetX = e.clientX - rect.left;
             offsetY = e.clientY - rect.top;
@@ -280,26 +419,27 @@
         });
 
         document.addEventListener('mousemove', function (e) {
-            if (!dragging) return;
+            if (!draggingWindow) return;
 
             let left = e.clientX - offsetX;
             let top = e.clientY - offsetY;
+
             const maxLeft = window.innerWidth - picker.offsetWidth;
             const maxTop = window.innerHeight - picker.offsetHeight;
 
-            left = Math.max(0, Math.min(left, maxLeft));
-            top = Math.max(0, Math.min(top, maxTop));
+            left = clamp(left, 0, maxLeft);
+            top = clamp(top, 0, maxTop);
 
             picker.style.left = left + 'px';
             picker.style.top = top + 'px';
         });
 
         document.addEventListener('mouseup', function () {
-            dragging = false;
+            draggingWindow = false;
             if (document.body) document.body.style.userSelect = '';
         });
 
-        setSelected('#ff0000');
+        updateUI();
     }
 
     if (document.readyState === 'loading') {
