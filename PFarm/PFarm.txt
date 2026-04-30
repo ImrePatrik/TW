@@ -1,0 +1,389 @@
+const NorbiFarmTabHandler = {
+    command: null,
+    pressTimer: null,
+    progressTimer: null,
+    botDetectionTimer: null,
+    botProtectionWatchTimer: null,
+    totalPresses: 0,
+    isRunning: false,
+    isPausedByBotProtection: false,
+
+    init: function() {
+        if (window.location.href.indexOf('screen=am_farm') === -1) {
+            return;
+        }
+
+        console.log('Farm tab handler initialized');
+        this.checkForCommand();
+    },
+
+    checkForCommand: function() {
+        var commandData = localStorage.getItem('norbi_farm_command');
+        if (!commandData) return;
+
+        this.command = JSON.parse(commandData);
+
+        if (this.command.action === 'start_farm') {
+            console.log('Farm command received, starting process...');
+            this.startFarmProcess();
+        }
+    },
+
+    startFarmProcess: function() {
+        var self = this;
+
+        console.log('Waiting 3 seconds for tab to fully load...');
+        setTimeout(function() {
+            self.waitForPageLoad(function() {
+                self.injectFarmGodScript(function() {
+                    self.waitForFarmGod(function() {
+                        self.startContinuousFarming();
+                    });
+                });
+            });
+        }, 3000);
+    },
+
+    waitForPageLoad: function(callback) {
+        if (document.readyState === 'complete') {
+            console.log('Page already loaded');
+            callback();
+        } else {
+            window.addEventListener('load', function() {
+                console.log('Page loaded');
+                callback();
+            });
+        }
+    },
+
+    injectFarmGodScript: function(callback) {
+        console.log('Injecting FarmGod script...');
+        console.log('Current URL:', window.location.href);
+        console.log('Window.$ available:', typeof window.$);
+
+        if (typeof window.$ !== 'undefined' && window.$.getScript) {
+            console.log('Executing FarmGod script using window.$ context...');
+            window.$.getScript('https://media.innogamescdn.com/com_DS_HU/scripts/farmgod.js');
+
+            console.log('FarmGod script execution command sent');
+
+            var checkAttempts = 0;
+            var checkInterval = setInterval(function() {
+                checkAttempts++;
+
+                if (typeof window.FarmGod !== 'undefined') {
+                    console.log('FarmGod loaded successfully!');
+                    clearInterval(checkInterval);
+                    callback();
+                } else if (checkAttempts >= 30) {
+                    console.error('FarmGod failed to load after 15 seconds');
+                    clearInterval(checkInterval);
+                    throw new Error('FarmGod script failed to load');
+                } else {
+                    console.log('Waiting for FarmGod... (attempt ' + checkAttempts + '/30)');
+                }
+            }, 500);
+        } else {
+            console.error('Farm tab jQuery not available');
+            throw new Error('Farm tab jQuery not available');
+        }
+    },
+
+    waitForFarmGod: function(callback) {
+        var attempts = 0;
+        var maxAttempts = 50;
+
+        var checkFarmGod = function() {
+            attempts++;
+
+            if (window.FarmGod && window.FarmGod.Main) {
+                console.log('FarmGod is ready');
+                callback();
+            } else if (attempts >= maxAttempts) {
+                throw new Error('FarmGod failed to initialize');
+            } else {
+                setTimeout(checkFarmGod, 100);
+            }
+        };
+
+        checkFarmGod();
+    },
+
+    startContinuousFarming: function() {
+        var self = this;
+
+        if (this.isRunning) {
+            console.log('Farming already running, skipping restart');
+            return;
+        }
+
+        console.log('Starting continuous farming with Enter pressing and progress monitoring...');
+
+        this.isRunning = true;
+        this.isPausedByBotProtection = false;
+        this.totalPresses = 0;
+
+        if (this.pressTimer) {
+            clearInterval(this.pressTimer);
+            this.pressTimer = null;
+        }
+
+        if (this.progressTimer) {
+            clearInterval(this.progressTimer);
+            this.progressTimer = null;
+        }
+
+        if (this.botDetectionTimer) {
+            clearInterval(this.botDetectionTimer);
+            this.botDetectionTimer = null;
+        }
+
+        this.pressTimer = setInterval(function() {
+            self.pressEnter();
+        }, 100);
+
+        this.progressTimer = setInterval(function() {
+            self.monitorProgress();
+        }, 100);
+
+        this.botDetectionTimer = setInterval(function() {
+            self.checkBotProtection();
+        }, 80);
+
+        console.log('Continuous farming started with bot protection monitoring');
+    },
+
+    pressEnter: function() {
+        if (!this.isRunning) return;
+
+        try {
+            var enterDownEvent = new KeyboardEvent('keydown', {
+                key: 'Enter',
+                code: 'Enter',
+                keyCode: 13,
+                which: 13,
+                bubbles: true,
+                cancelable: true
+            });
+
+            var enterUpEvent = new KeyboardEvent('keyup', {
+                key: 'Enter',
+                code: 'Enter',
+                keyCode: 13,
+                which: 13,
+                bubbles: true,
+                cancelable: true
+            });
+
+            document.dispatchEvent(enterDownEvent);
+            document.dispatchEvent(enterUpEvent);
+
+            if (document.activeElement) {
+                document.activeElement.dispatchEvent(enterDownEvent);
+                document.activeElement.dispatchEvent(enterUpEvent);
+            }
+
+            this.totalPresses++;
+
+            if (this.totalPresses % 50 === 0) {
+                console.log('Pressed Enter ' + this.totalPresses + ' times');
+            }
+        } catch (error) {
+            console.error('Error pressing Enter:', error);
+        }
+    },
+
+    monitorProgress: function() {
+        if (!this.isRunning) return;
+
+        try {
+            var progressBar = document.getElementById('FarmGodProgessbar');
+
+            if (!progressBar) {
+                return;
+            }
+
+            var labelSpan = progressBar.querySelector('span.label');
+
+            if (!labelSpan) {
+                return;
+            }
+
+            var progressText = labelSpan.textContent.trim();
+            var cleanText = labelSpan.innerText || labelSpan.textContent;
+            console.log('Tab handler clean text:', cleanText);
+
+            var originalTotal = null;
+            var match = null;
+            var parts = cleanText.split(' / ');
+            console.log('Tab handler split parts:', parts);
+
+            if (parts.length === 2) {
+                var currentStr = parts[0].trim();
+                var totalStr = parts[1].trim();
+
+                if (currentStr.indexOf('.') !== -1) {
+                    console.log('Tab handler current thousands separator detected: ' + currentStr + ' -> ' + currentStr.replace('.', ''));
+                    currentStr = currentStr.replace('.', '');
+                }
+
+                if (totalStr.indexOf('.') !== -1) {
+                    console.log('Tab handler total thousands separator detected: ' + totalStr + ' -> ' + totalStr.replace('.', ''));
+                    originalTotal = parseFloat(totalStr);
+                    totalStr = totalStr.replace('.', '');
+                }
+
+                match = [cleanText, currentStr, totalStr];
+            }
+
+            if (!match) {
+                console.log('FarmGod Progress: Could not parse format "' + progressText + '"');
+                return;
+            }
+
+            var current = parseInt(match[1]);
+            var total = parseInt(match[2]);
+            var percentage = total > 0 ? (current / total) * 100 : 0;
+
+            if (progressText.indexOf('.') !== -1) {
+                console.log('FarmGod Progress: Decimal format detected "' + progressText + '" -> ' + current + '/' + total + ' (rounded up)');
+            }
+
+            console.log('FarmGod Progress: ' + progressText + ' (' + percentage.toFixed(1) + '%)');
+            console.log('Tab handler completion check: ' + current + ' >= ' + total + ' = ' + (current >= total));
+
+            if (current >= total) {
+                console.log('Farming completed! Final: ' + progressText + ' (' + percentage.toFixed(1) + '%)');
+                this.stopFarming(true);
+
+                var reportedVillages = originalTotal !== null ? originalTotal : current;
+
+                this.reportResult('success', 'Farming completed successfully', {
+                    villages: reportedVillages,
+                    totalPresses: this.totalPresses,
+                    finalProgress: progressText
+                });
+                return;
+            }
+        } catch (error) {
+            console.error('Error monitoring progress:', error);
+        }
+    },
+
+    stopFarming: function(clearWatcher) {
+        this.isRunning = false;
+
+        if (this.pressTimer) {
+            clearInterval(this.pressTimer);
+            this.pressTimer = null;
+        }
+
+        if (this.progressTimer) {
+            clearInterval(this.progressTimer);
+            this.progressTimer = null;
+        }
+
+        if (this.botDetectionTimer) {
+            clearInterval(this.botDetectionTimer);
+            this.botDetectionTimer = null;
+        }
+
+        if (clearWatcher !== false && this.botProtectionWatchTimer) {
+            clearInterval(this.botProtectionWatchTimer);
+            this.botProtectionWatchTimer = null;
+        }
+
+        console.log('Stopped farming. Total Enter presses: ' + this.totalPresses);
+    },
+
+    reportResult: function(status, message, extraData) {
+        var result = {
+            status: status,
+            message: message,
+            timestamp: Date.now(),
+            error: status === 'error' ? message : null
+        };
+
+        if (extraData) {
+            result.villages = extraData.villages;
+            result.totalPresses = extraData.totalPresses;
+            result.finalProgress = extraData.finalProgress;
+        }
+
+        localStorage.setItem('norbi_farm_result', JSON.stringify(result));
+        console.log('Result reported to engine');
+    },
+
+    startBotProtectionWatcher: function() {
+        var self = this;
+
+        if (this.botProtectionWatchTimer) {
+            clearInterval(this.botProtectionWatchTimer);
+            this.botProtectionWatchTimer = null;
+        }
+
+        console.log('Watching bot protection every 15 seconds...');
+
+        this.botProtectionWatchTimer = setInterval(function() {
+            var botElement = document.getElementById('botprotection_quest');
+
+            if (botElement) {
+                console.log('Bot protection still active...');
+                return;
+            }
+
+            clearInterval(self.botProtectionWatchTimer);
+            self.botProtectionWatchTimer = null;
+            self.isPausedByBotProtection = false;
+
+            var restartDelay = Math.floor(Math.random() * 2001) + 5000;
+
+            console.log('Bot protection disappeared. Restarting in ' + restartDelay + ' ms...');
+
+            setTimeout(function() {
+                if (!self.isRunning && !document.getElementById('botprotection_quest')) {
+                    console.log('Restarting farming after bot protection...');
+                    self.startContinuousFarming();
+                } else {
+                    console.log('Restart skipped because bot protection came back or farming already started.');
+                }
+            }, restartDelay);
+        }, 15000);
+    },
+
+    checkBotProtection: function() {
+        if (!this.isRunning && !this.isPausedByBotProtection) return false;
+
+        try {
+            var botElement = document.getElementById('botprotection_quest');
+
+            if (botElement && !this.isPausedByBotProtection) {
+                console.log('BOT PROTECTION DETECTED in farm tab! Stopping farming and starting watcher...');
+
+                this.isPausedByBotProtection = true;
+
+                try {
+                    window.opener.postMessage({
+                        source: 'norbi_farm_bot_detection',
+                        message: 'Bot protection detected during active farming! Farming paused, watcher started.',
+                        detectionMethod: 'botprotection_quest',
+                        totalPresses: this.totalPresses,
+                        timestamp: Date.now()
+                    }, '*');
+                    console.log('Notification message sent to engine tab');
+                } catch (error) {
+                    console.error('Failed to send message to engine tab:', error);
+                }
+
+                this.stopFarming(false);
+                this.startBotProtectionWatcher();
+
+                return true;
+            }
+        } catch (error) {
+            console.error('Error checking bot protection:', error);
+        }
+
+        return false;
+    }
+};
