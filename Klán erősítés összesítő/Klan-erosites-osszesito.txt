@@ -1,6 +1,15 @@
 //Készítő: Patika30
 
 (async () => {
+    const isVillageInfoPage =
+        location.href.includes('screen=info_village') ||
+        document.querySelector('#content_value table.vis') !== null;
+
+    if (!isVillageInfoPage) {
+        alert('Ezt a scriptet csak a faluinformáció oldalon lehet futtatni.');
+        return;
+    }
+
     const translations = {
         hu_HU: {
             title: 'Klán Erősítés Összesítő',
@@ -9,6 +18,7 @@
             total: 'Összesen',
             ownAccount: 'Saját fiók',
             credit: 'Készítette: Patika30',
+            wrongPage: 'Ezt a scriptet csak a faluinformáció oldalon lehet futtatni.',
             unitNames: [
                 'Lándzsás', 'Kardforgató', 'Bárdos', 'Íjász',
                 'Kém', 'Könnyűlovas', 'Lovas íjász', 'Nehézlovas',
@@ -16,12 +26,13 @@
             ]
         },
         en_DK: {
-            title: 'Tribe Reinforcement Summary',
+            title: 'Clan Reinforcement Summary',
             close: 'Close',
             account: 'Account',
             total: 'Total',
             ownAccount: 'Own account',
             credit: 'Created by: Patika30',
+            wrongPage: 'This script can only be run on the village information screen.',
             unitNames: [
                 'Spear fighter', 'Swordsman', 'Axeman', 'Archer',
                 'Scout', 'Light cavalry', 'Mounted archer', 'Heavy cavalry',
@@ -29,12 +40,13 @@
             ]
         },
         en_US: {
-            title: 'Tribe Reinforcement Summary',
+            title: 'Clan Reinforcement Summary',
             close: 'Close',
             account: 'Account',
             total: 'Total',
             ownAccount: 'Own account',
             credit: 'Created by: Patika30',
+            wrongPage: 'This script can only be run on the village information screen.',
             unitNames: [
                 'Spear fighter', 'Swordsman', 'Axeman', 'Archer',
                 'Scout', 'Light cavalry', 'Mounted archer', 'Heavy cavalry',
@@ -48,6 +60,12 @@
         : 'hu_HU';
 
     const t = translations[locale] || translations.en_DK || translations.hu_HU;
+
+    if (!location.href.includes('screen=info_village')) {
+        alert(t.wrongPage);
+        return;
+    }
+
     const unitNames = t.unitNames;
 
     const ownName = (typeof game_data === 'object' && game_data.player && game_data.player.name)
