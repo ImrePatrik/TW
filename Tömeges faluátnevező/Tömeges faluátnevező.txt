@@ -1,9 +1,59 @@
 //Készítette: Patika30
 
 (function() {
+    const translations = {
+        hu_HU: {
+            missingVillage: 'Nem található village paraméter az URL-ben!',
+            title: 'Tömeges faluátnevező',
+            numbers: 'Sorszám',
+            numberLength: 'Számhossz',
+            continent: 'Kontinens:',
+            villageName: 'Falunév:',
+            preview: 'Előnézet:',
+            holdEnter: 'Nyomva tartott Enterrel nevezi át egymás után a falvakat!',
+            done: 'Átnevezés kész:',
+            renamedProgress: 'falut átnevezett.',
+            createdBy: 'Készítette: Patika30'
+        },
+        en_DK: {
+            missingVillage: 'Village parameter was not found in the URL!',
+            title: 'Mass village renamer',
+            numbers: 'Numbers',
+            numberLength: 'Number length',
+            continent: 'Continent:',
+            villageName: 'Village name:',
+            preview: 'Preview:',
+            holdEnter: 'Hold Enter to rename villages one after another!',
+            done: 'Renaming finished:',
+            renamedProgress: 'villages renamed.',
+            createdBy: 'Created by: Patika30'
+        },
+        en_US: {
+            missingVillage: 'Village parameter was not found in the URL!',
+            title: 'Mass village renamer',
+            numbers: 'Numbers',
+            numberLength: 'Number length',
+            continent: 'Continent:',
+            villageName: 'Village name:',
+            preview: 'Preview:',
+            holdEnter: 'Hold Enter to rename villages one after another!',
+            done: 'Renaming finished:',
+            renamedProgress: 'villages renamed.',
+            createdBy: 'Created by: Patika30'
+        }
+    };
+
+    const locale =
+        (typeof game_data !== 'undefined' && game_data.locale) ? game_data.locale :
+        (typeof gamedata !== 'undefined' && gamedata.locale) ? gamedata.locale :
+        'en_US';
+
+    const normalizedLocale = String(locale).replace('-', '_');
+    const t = translations[normalizedLocale] || translations.en_US;
+
     // --- Kombinált áttekintés (mode=combined + screen=overview_villages) ---
     var url = new URL(window.location.href);
-    var base = url.origin + url.pathname; // .../game.php
+    var base = url.origin + url.pathname;
     var params = url.searchParams;
     var village = params.get('village');
 
@@ -13,24 +63,24 @@
 
     if (!onCombined) {
         if (!village) {
-            alert('Nem található village paraméter az URL-ben!');
+            alert(t.missingVillage);
             return;
         }
-        // Új, tiszta URL csak a szükséges paraméterekkel
         var newUrl = base + '?village=' + encodeURIComponent(village) +
                      '&screen=overview_villages&mode=combined';
         window.location.href = newUrl;
         return;
     }
 
-    // ----- INNENTŐL JÖN AZ EGÉSZ INTERFACE + ÁTNEVEZŐ LOGIKA -----
     const uniqueId = 'falunev-atnevezo-gui-enter';
     if (document.getElementById(uniqueId)) {
         document.getElementById(uniqueId).style.zIndex = 10000;
         document.getElementById(uniqueId).style.display = 'block';
         return;
     }
+
     const storageKey = 'falunevAtnevezoConfig_enter_order';
+
     function getDefaultConfig() {
         return {
             order: ['num','cont','static'],
@@ -43,33 +93,38 @@
             staticText: 'Falunév'
         };
     }
-    function saveConfig(cfg) { localStorage.setItem(storageKey, JSON.stringify(cfg)); }
+
+    function saveConfig(cfg) {
+        localStorage.setItem(storageKey, JSON.stringify(cfg));
+    }
+
     function loadConfig() {
         let stored = localStorage.getItem(storageKey);
         return stored ? JSON.parse(stored) : getDefaultConfig();
     }
+
     let cfg = loadConfig();
 
     function makeRow(type, cfg) {
         if (type === 'num') {
             return `<div class="crit-row" data-type="num" draggable="true" style="padding:5px 0;font-size:15px;display:flex;align-items:center;">
                 <span class="drag-handle" style="cursor:move;margin-right:5px;">&#x2630;</span>
-                <input type="checkbox" id="useNum" ${cfg.useNum ? 'checked' : ''} style="margin-right:4px;">Sorszám 
+                <input type="checkbox" id="useNum" ${cfg.useNum ? 'checked' : ''} style="margin-right:4px;">${t.numbering}
                 <input type="number" id="startNum" value="${cfg.startNum}" style="width:47px;">
-                <input type="number" id="digits" value="${cfg.digits}" style="width:34px;" min="1" max="6"> <small>Számhossz</small>
+                <input type="number" id="digits" value="${cfg.digits}" style="width:34px;" min="1" max="6"> <small>${t.numberLength}</small>
             </div>`;
         }
         if (type === 'cont') {
             return `<div class="crit-row" data-type="cont" draggable="true" style="padding:5px 0;font-size:15px;display:flex;align-items:center;">
                 <span class="drag-handle" style="cursor:move;margin-right:5px;">&#x2630;</span>
-                <input type="checkbox" id="useCont" ${cfg.useCont ? 'checked' : ''} style="margin-right:4px;">Kontinens:
+                <input type="checkbox" id="useCont" ${cfg.useCont ? 'checked' : ''} style="margin-right:4px;">${t.continent}
                 <input type="text" id="continentText" value="${cfg.continentText}" style="width:60px;" placeholder="K">
             </div>`;
         }
         if (type === 'static') {
             return `<div class="crit-row" data-type="static" draggable="true" style="padding:5px 0;font-size:15px;display:flex;align-items:center;">
                 <span class="drag-handle" style="cursor:move;margin-right:5px;">&#x2630;</span>
-                <input type="checkbox" id="useStatic" ${cfg.useStatic ? 'checked' : ''} style="margin-right:4px;">Falunév:
+                <input type="checkbox" id="useStatic" ${cfg.useStatic ? 'checked' : ''} style="margin-right:4px;">${t.villageName}
                 <input type="text" id="staticText" value="${cfg.staticText}" style="width:120px;">
             </div>`;
         }
@@ -99,7 +154,7 @@
         gui.style.cssText = 'position:fixed;top:60px;left:40px;z-index:10000;background:#f7eed3;border:2px ridge brown;width:440px;padding:0;box-shadow:0 4px 8px rgba(0,0,0,.2);';
         gui.innerHTML = `
         <div id="falunev-atnevezo-dragbar-enter" style="cursor:move;background:#dfcca6;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #c6ae78;">
-            <span style="font-size:18px;">Tömeges faluátnevező</span>
+            <span style="font-size:18px;">${t.title}</span>
             <button onclick="document.getElementById('${uniqueId}').remove()" style="font-size:16px;color:red;">×</button>
         </div>
         <div style="padding:16px;">
@@ -107,13 +162,13 @@
                 ${cfg.order.map(x => makeRow(x, cfg)).join('')}
             </div>
             <div style="margin-top:12px;">
-                <b>Előnézet:</b> <span id="previewFaluNev" style="background:#fffbe8;border:1px solid #dfcca6;padding:2px 12px;">${generatePreview(cfg)}</span>
+                <b>${t.preview}</b> <span id="previewFaluNev" style="background:#fffbe8;border:1px solid #dfcca6;padding:2px 12px;">${generatePreview(cfg)}</span>
             </div>
             <br>
-            <div style="font-size:14px;color:#005;font-weight:bold;">Nyomva tartott Enterrel nevezi át egymás után a falvakat!</div>
+            <div style="font-size:14px;color:#005;font-weight:bold;">${t.holdEnter}</div>
             <div id="renameStatus" style="margin-top:8px;font-size:14px;color:green"></div>
             <div style="margin-top:16px;margin-bottom:3px;text-align:right;">
-                <span style="color:#999;font-size:11px;font-family:Arial, sans-serif;">Készítette: Patika30</span>
+                <span style="color:#999;font-size:11px;font-family:Arial, sans-serif;">${t.createdBy}</span>
             </div>
         </div>
         `;
@@ -121,13 +176,19 @@
 
         let dragBar = gui.querySelector('#falunev-atnevezo-dragbar-enter');
         let offsetX = 0, offsetY = 0, dragging = false;
+
         dragBar.addEventListener('mousedown', function(e) {
             dragging = true;
             offsetX = e.clientX - gui.offsetLeft;
             offsetY = e.clientY - gui.offsetTop;
             document.body.style.userSelect = 'none';
         });
-        document.addEventListener('mouseup', function() { dragging = false; document.body.style.userSelect = ''; });
+
+        document.addEventListener('mouseup', function() {
+            dragging = false;
+            document.body.style.userSelect = '';
+        });
+
         document.addEventListener('mousemove', function(e) {
             if (dragging) {
                 gui.style.left = (e.clientX - offsetX) + 'px';
@@ -152,38 +213,46 @@
                     e.dataTransfer.setData('text/plain', '');
                     setTimeout(() => row.style.visibility = "hidden", 10);
                 });
-                row.addEventListener('dragend', function(e) {
+
+                row.addEventListener('dragend', function() {
                     removeAllPlaceholders();
                     if (draggingEl) draggingEl.style.visibility = "";
                     draggingEl = null;
                 });
+
                 row.addEventListener('dragover', function(e) {
                     e.preventDefault();
                     removeAllPlaceholders();
                     critArea.insertBefore(placeholder, row);
                 });
-                row.addEventListener('dragleave', function(e) {
+
+                row.addEventListener('dragleave', function() {
                     removeAllPlaceholders();
                 });
+
                 row.addEventListener('drop', function(e) {
                     e.preventDefault();
                     removeAllPlaceholders();
                     if (draggingEl) draggingEl.style.visibility = "";
+
                     let children = Array.from(critArea.children).filter(x => x !== placeholder);
                     let dropIndex = children.indexOf(row);
                     if (dropIndex > currentIndex) dropIndex--;
+
                     let newOrder = cfg.order.slice();
                     newOrder.splice(currentIndex, 1);
                     newOrder.splice(dropIndex, 0, draggingType);
                     cfg.order = newOrder;
                     saveConfig(cfg);
+
                     removeAllPlaceholders();
                     critArea.innerHTML = cfg.order.map(x => makeRow(x, cfg)).join('');
                     bindAll();
                     updatePreview();
                 });
             });
-            critArea.addEventListener('dragover', function(e){
+
+            critArea.addEventListener('dragover', function(e) {
                 e.preventDefault();
                 removeAllPlaceholders();
                 if (!critArea.contains(placeholder)) critArea.appendChild(placeholder);
@@ -193,23 +262,55 @@
         function bindAll() {
             removeAllPlaceholders();
             bindDragAndDrop();
+
             let numRow = gui.querySelector('[data-type="num"]');
             if (numRow) {
-                numRow.querySelector('#useNum').onchange = function() { cfg.useNum = this.checked; saveConfig(cfg); updatePreview(); };
-                numRow.querySelector('#startNum').onchange = function() { cfg.startNum = parseInt(this.value,10)||1; saveConfig(cfg); updatePreview(); };
-                numRow.querySelector('#digits').onchange = function() { cfg.digits = parseInt(this.value,10)||3; saveConfig(cfg); updatePreview(); };
+                numRow.querySelector('#useNum').onchange = function() {
+                    cfg.useNum = this.checked;
+                    saveConfig(cfg);
+                    updatePreview();
+                };
+                numRow.querySelector('#startNum').onchange = function() {
+                    cfg.startNum = parseInt(this.value,10) || 1;
+                    saveConfig(cfg);
+                    updatePreview();
+                };
+                numRow.querySelector('#digits').onchange = function() {
+                    cfg.digits = parseInt(this.value,10) || 3;
+                    saveConfig(cfg);
+                    updatePreview();
+                };
             }
+
             let contRow = gui.querySelector('[data-type="cont"]');
             if (contRow) {
-                contRow.querySelector('#useCont').onchange = function() { cfg.useCont = this.checked; saveConfig(cfg); updatePreview(); };
-                contRow.querySelector('#continentText').oninput = function() { cfg.continentText = this.value; saveConfig(cfg); updatePreview(); };
+                contRow.querySelector('#useCont').onchange = function() {
+                    cfg.useCont = this.checked;
+                    saveConfig(cfg);
+                    updatePreview();
+                };
+                contRow.querySelector('#continentText').oninput = function() {
+                    cfg.continentText = this.value;
+                    saveConfig(cfg);
+                    updatePreview();
+                };
             }
+
             let staticRow = gui.querySelector('[data-type="static"]');
             if (staticRow) {
-                staticRow.querySelector('#useStatic').onchange = function() { cfg.useStatic = this.checked; saveConfig(cfg); updatePreview(); };
-                staticRow.querySelector('#staticText').oninput = function() { cfg.staticText = this.value; saveConfig(cfg); updatePreview(); };
+                staticRow.querySelector('#useStatic').onchange = function() {
+                    cfg.useStatic = this.checked;
+                    saveConfig(cfg);
+                    updatePreview();
+                };
+                staticRow.querySelector('#staticText').oninput = function() {
+                    cfg.staticText = this.value;
+                    saveConfig(cfg);
+                    updatePreview();
+                };
             }
         }
+
         bindAll();
 
         function updatePreview() {
@@ -218,7 +319,8 @@
 
         let enterHeld = false, idx = 0;
         let spans = [];
-        document.addEventListener('keydown', function(e){
+
+        document.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !enterHeld && document.getElementById(uniqueId)) {
                 enterHeld = true;
                 idx = 0;
@@ -226,52 +328,70 @@
                 nextRename();
             }
         });
-        document.addEventListener('keyup', function(e){
-            if (e.key === 'Enter' && enterHeld) { enterHeld = false; }
+
+        document.addEventListener('keyup', function(e) {
+            if (e.key === 'Enter' && enterHeld) {
+                enterHeld = false;
+            }
         });
 
         function nextRename() {
             if (!enterHeld || idx >= spans.length) {
-                gui.querySelector('#renameStatus').innerText = `Átnevezés kész: ${idx} falu`;
+                gui.querySelector('#renameStatus').innerText = `${t.done} ${idx} ${normalizedLocale === 'hu_HU' ? 'falu' : ''}`.trim();
                 return;
             }
+
             let newName = generatePreview(cfg, idx).substring(0, 32);
             var span = spans[idx];
-            if (!span) { idx++; setTimeout(nextRename, 320); return; }
+
+            if (!span) {
+                idx++;
+                setTimeout(nextRename, 320);
+                return;
+            }
+
             var curr =
                 span.querySelector('input[type="text"]') ?
                     span.querySelector('input[type="text"]').value.trim() :
                 (span.querySelector('.quickedit-content') ?
                     span.querySelector('.quickedit-content').innerText.trim() :
                     "");
+
             if (curr === newName) {
                 idx++;
                 setTimeout(nextRename, 80);
                 return;
             }
+
             var icon = span.querySelector('.rename-icon');
             if (icon) icon.click();
 
             let tries = 0;
-            function waitInputAndRename(){
+
+            function waitInputAndRename() {
                 let input = span.querySelector('input[type="text"]');
                 let btn = span.querySelector('button.btn-confirm-yes') ||
                           span.querySelector('input[type="button"]') ||
                           span.querySelector('button.btn-confirm') ||
                           span.querySelector('.btn-confirm-yes');
+
                 if (input && btn) {
                     input.value = newName;
                     input.dispatchEvent(new Event('input', { bubbles: true }));
                     btn.click();
-                    gui.querySelector('#renameStatus').innerText = `${idx+1} falut átnevezett.`;
+                    gui.querySelector('#renameStatus').innerText = `${idx + 1} ${t.renamedProgress}`;
                     idx++;
                     setTimeout(nextRename, 320);
                 } else {
                     tries++;
                     if (tries < 20) setTimeout(waitInputAndRename, 90);
-                    else { idx++; setTimeout(nextRename, 320); }
+                    else {
+                        idx++;
+                        setTimeout(nextRename, 320);
+                    }
                 }
             }
+
             waitInputAndRename();
         }
     }
