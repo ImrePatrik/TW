@@ -1,16 +1,58 @@
 //Készítő: Patika30
 
 (async () => {
-    const unitNames = [
-        'Lándzsás', 'Kardforgató', 'Bárdos', 'Íjász',
-        'Kém', 'Könnyűlovas', 'Lovas íjász', 'Nehézlovas',
-        'Faltörő kos', 'Katapult', 'Lovag', 'Főnemes'
-        // 'Milícia' eltávolítva
-    ];
+    const translations = {
+        hu_HU: {
+            title: 'Klán Erősítés Összesítő',
+            close: 'Bezárás',
+            account: 'Fiók',
+            total: 'Összesen',
+            ownAccount: 'Saját fiók',
+            credit: 'Készítette: Patika30',
+            unitNames: [
+                'Lándzsás', 'Kardforgató', 'Bárdos', 'Íjász',
+                'Kém', 'Könnyűlovas', 'Lovas íjász', 'Nehézlovas',
+                'Faltörő kos', 'Katapult', 'Lovag', 'Főnemes'
+            ]
+        },
+        en_DK: {
+            title: 'Clan Reinforcement Summary',
+            close: 'Close',
+            account: 'Account',
+            total: 'Total',
+            ownAccount: 'Own account',
+            credit: 'Created by: Patika30',
+            unitNames: [
+                'Spear fighter', 'Swordsman', 'Axeman', 'Archer',
+                'Scout', 'Light cavalry', 'Mounted archer', 'Heavy cavalry',
+                'Ram', 'Catapult', 'Paladin', 'Nobleman'
+            ]
+        },
+        en_US: {
+            title: 'Clan Reinforcement Summary',
+            close: 'Close',
+            account: 'Account',
+            total: 'Total',
+            ownAccount: 'Own account',
+            credit: 'Created by: Patika30',
+            unitNames: [
+                'Spear fighter', 'Swordsman', 'Axeman', 'Archer',
+                'Scout', 'Light cavalry', 'Mounted archer', 'Heavy cavalry',
+                'Ram', 'Catapult', 'Paladin', 'Nobleman'
+            ]
+        }
+    };
 
-    const sajatNev = (typeof game_data === 'object' && game_data.player && game_data.player.name) ?
-        game_data.player.name.trim() :
-        'Saját fiók';
+    const locale = (typeof game_data === 'object' && game_data.locale)
+        ? game_data.locale
+        : 'hu_HU';
+
+    const t = translations[locale] || translations.en_DK || translations.hu_HU;
+    const unitNames = t.unitNames;
+
+    const ownName = (typeof game_data === 'object' && game_data.player && game_data.player.name)
+        ? game_data.player.name.trim()
+        : t.ownAccount;
 
     const rows = document.querySelectorAll('tr[class^="village_row_"]');
     let playerTotals = {};
@@ -20,25 +62,32 @@
         if (cells.length < 2) return;
 
         const links = cells[0].querySelectorAll('a');
-        let playerText = (links.length < 2 || !links[1].textContent.trim()) ? sajatNev : links[1].textContent.trim();
+        let playerText = (links.length < 2 || !links[1].textContent.trim())
+            ? ownName
+            : links[1].textContent.trim();
 
         const parenStart = playerText.indexOf('(');
         const parenEnd = playerText.indexOf(')');
         let player = '';
+
         if (parenStart !== -1 && parenEnd !== -1 && parenEnd > parenStart) {
             player = playerText.substring(parenStart + 1, parenEnd).trim();
         } else {
-            player = playerText;
+            player = playerText.trim();
         }
 
         if (!player) return;
 
-        const unitsRaw = Array.from(cells).slice(1, unitNames.length + 1).map(td => parseInt(td.textContent.trim()) || 0);
+        const unitsRaw = Array.from(cells)
+            .slice(1, unitNames.length + 1)
+            .map(td => parseInt(td.textContent.trim(), 10) || 0);
+
         if (unitsRaw.every(n => n === 0)) return;
 
         if (!playerTotals[player]) {
             playerTotals[player] = new Array(unitNames.length).fill(0);
         }
+
         unitsRaw.forEach((num, idx) => {
             playerTotals[player][idx] += num;
         });
@@ -46,6 +95,7 @@
 
     let existingModal = document.getElementById('clanReinforcementsModal');
     if (existingModal) existingModal.remove();
+
     let existingOverlay = document.getElementById('clanReinforcementsOverlay');
     if (existingOverlay) existingOverlay.remove();
 
@@ -64,16 +114,17 @@
     modal.style.width = '90vw';
     modal.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
 
-    let html = `<h2 style="margin-top:0">Klán Erősítés Összesítő</h2>`;
-    html += `<button id="closeReinforcementsModal" style="float:right; margin-bottom:10px;">Bezárás</button>`;
+    let html = `<button id="closeReinforcementsModal" style="float:right; margin-bottom:10px;">${t.close}</button>`;
+    html += `<h2 style="margin-top:0">${t.title}</h2>`;
     html += `<table style="border-collapse: collapse; width: 100%;">`;
-    html += `<thead><tr><th style="border: 2px solid #fff; padding:5px; text-align:center;">Fiók</th>`;
+    html += `<thead><tr><th style="border: 2px solid #fff; padding:5px; text-align:center;">${t.account}</th>`;
+
     unitNames.forEach(name => {
         html += `<th style="border: 2px solid #fff; padding:5px; text-align:center;">${name}</th>`;
     });
+
     html += `</tr></thead><tbody>`;
 
-    // Játékosok sorai
     for (const player in playerTotals) {
         html += `<tr><td style="border: 2px solid #fff; padding:5px; font-weight:bold; text-align:center;">${player}</td>`;
         playerTotals[player].forEach(num => {
@@ -82,14 +133,15 @@
         html += `</tr>`;
     }
 
-    // Összesítő sor hozzáadása
     const totalUnits = new Array(unitNames.length).fill(0);
     for (const player in playerTotals) {
         playerTotals[player].forEach((num, idx) => {
             totalUnits[idx] += num;
         });
     }
-    html += `<tr style="font-weight:bold; background-color:#f0e6c8;"><td style="border: 2px solid #fff; padding:5px; text-align:center;">Összesen</td>`;
+
+    html += `<tr style="font-weight:bold; background-color:#f0e6c8;">`;
+    html += `<td style="border: 2px solid #fff; padding:5px; text-align:center;">${t.total}</td>`;
     totalUnits.forEach(num => {
         html += `<td style="border: 2px solid #fff; padding:5px; text-align:center;">${num > 0 ? num : ''}</td>`;
     });
@@ -97,7 +149,6 @@
 
     html += `</tbody></table>`;
 
-    // Szerzői felirat
     html += `<div style="
         width: 100%;
         display: flex;
@@ -110,8 +161,9 @@
             color: #000000;
             opacity: 0.85;
             font-style: italic;
-            text-align: right;">
-            Készítette: Patika30
+            text-align: right;
+        ">
+            ${t.credit}
         </span>
     </div>`;
 
