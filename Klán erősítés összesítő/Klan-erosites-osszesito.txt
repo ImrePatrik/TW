@@ -16,7 +16,7 @@
             ]
         },
         en_DK: {
-            title: 'Clan Reinforcement Summary',
+            title: 'Tribe Reinforcement Summary',
             close: 'Close',
             account: 'Account',
             total: 'Total',
@@ -29,7 +29,7 @@
             ]
         },
         en_US: {
-            title: 'Clan Reinforcement Summary',
+            title: 'Tribe Reinforcement Summary',
             close: 'Close',
             account: 'Account',
             total: 'Total',
