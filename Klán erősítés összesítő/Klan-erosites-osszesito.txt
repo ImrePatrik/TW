@@ -1,15 +1,6 @@
 //Készítő: Patika30
 
 (async () => {
-    const isVillageInfoPage =
-        location.href.includes('screen=info_village') ||
-        document.querySelector('#content_value table.vis') !== null;
-
-    if (!isVillageInfoPage) {
-        alert('Ezt a scriptet csak a faluinformáció oldalon lehet futtatni.');
-        return;
-    }
-
     const translations = {
         hu_HU: {
             title: 'Klán Erősítés Összesítő',
@@ -26,7 +17,7 @@
             ]
         },
         en_DK: {
-            title: 'Clan Reinforcement Summary',
+            title: 'Tribe Reinforcement Summary',
             close: 'Close',
             account: 'Account',
             total: 'Total',
@@ -40,7 +31,7 @@
             ]
         },
         en_US: {
-            title: 'Clan Reinforcement Summary',
+            title: 'Tribe Reinforcement Summary',
             close: 'Close',
             account: 'Account',
             total: 'Total',
@@ -61,7 +52,12 @@
 
     const t = translations[locale] || translations.en_DK || translations.hu_HU;
 
-    if (!location.href.includes('screen=info_village')) {
+    const params = new URLSearchParams(location.search);
+    const screen = params.get('screen');
+    const rows = document.querySelectorAll('tr[class^="village_row_"]');
+    const hasVillageRows = rows.length > 0;
+
+    if (screen !== 'info_village' || !hasVillageRows) {
         alert(t.wrongPage);
         return;
     }
@@ -72,7 +68,6 @@
         ? game_data.player.name.trim()
         : t.ownAccount;
 
-    const rows = document.querySelectorAll('tr[class^="village_row_"]');
     let playerTotals = {};
 
     rows.forEach(row => {
