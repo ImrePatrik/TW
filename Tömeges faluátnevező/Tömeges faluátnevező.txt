@@ -5,7 +5,7 @@
         hu_HU: {
             missingVillage: 'Nem található village paraméter az URL-ben!',
             title: 'Tömeges faluátnevező',
-            numbering: 'Sorszám',
+            numbers: 'Sorszám',
             numberLength: 'Számhossz',
             continent: 'Kontinens:',
             villageName: 'Falunév:',
@@ -13,12 +13,13 @@
             holdEnter: 'Nyomva tartott Enterrel nevezi át egymás után a falvakat!',
             done: 'Átnevezés kész:',
             renamedProgress: 'falut átnevezett.',
+            villagesWord: 'falu',
             createdBy: 'Készítette: Patika30'
         },
         en_DK: {
             missingVillage: 'Village parameter was not found in the URL!',
             title: 'Mass village renamer',
-            numbering: 'Numbering',
+            numbers: 'Numbers',
             numberLength: 'Number length',
             continent: 'Continent:',
             villageName: 'Village name:',
@@ -26,12 +27,13 @@
             holdEnter: 'Hold Enter to rename villages one after another!',
             done: 'Renaming finished:',
             renamedProgress: 'villages renamed.',
+            villagesWord: 'villages',
             createdBy: 'Created by: Patika30'
         },
         en_US: {
             missingVillage: 'Village parameter was not found in the URL!',
             title: 'Mass village renamer',
-            numbering: 'Numbering',
+            numbers: 'Numbers',
             numberLength: 'Number length',
             continent: 'Continent:',
             villageName: 'Village name:',
@@ -39,6 +41,7 @@
             holdEnter: 'Hold Enter to rename villages one after another!',
             done: 'Renaming finished:',
             renamedProgress: 'villages renamed.',
+            villagesWord: 'villages',
             createdBy: 'Created by: Patika30'
         }
     };
@@ -51,7 +54,6 @@
     const normalizedLocale = String(locale).replace('-', '_');
     const t = translations[normalizedLocale] || translations.en_US;
 
-    // --- Kombinált áttekintés (mode=combined + screen=overview_villages) ---
     var url = new URL(window.location.href);
     var base = url.origin + url.pathname;
     var params = url.searchParams;
@@ -83,14 +85,14 @@
 
     function getDefaultConfig() {
         return {
-            order: ['num','cont','static'],
+            order: ['num', 'cont', 'static'],
             useNum: true,
             startNum: 1,
-            digits: 3,
-            useCont: true,
+            digits: 2,
+            useCont: false,
             continentText: 'K',
             useStatic: true,
-            staticText: 'Falunév'
+            staticText: ''
         };
     }
 
@@ -109,23 +111,23 @@
         if (type === 'num') {
             return `<div class="crit-row" data-type="num" draggable="true" style="padding:5px 0;font-size:15px;display:flex;align-items:center;">
                 <span class="drag-handle" style="cursor:move;margin-right:5px;">&#x2630;</span>
-                <input type="checkbox" id="useNum" ${cfg.useNum ? 'checked' : ''} style="margin-right:4px;">${t.numbering}
-                <input type="number" id="startNum" value="${cfg.startNum}" style="width:47px;">
-                <input type="number" id="digits" value="${cfg.digits}" style="width:34px;" min="1" max="6"> <small>${t.numberLength}</small>
+                <input type="checkbox" id="useNum" ${cfg.useNum ? 'checked' : ''} style="margin-right:4px;">${t.numbers}
+                <input type="number" id="startNum" value="${cfg.startNum}" style="width:47px;margin-left:4px;">
+                <input type="number" id="digits" value="${cfg.digits}" style="width:34px;margin-left:4px;" min="1" max="6"> <small style="margin-left:4px;">${t.numberLength}</small>
             </div>`;
         }
         if (type === 'cont') {
             return `<div class="crit-row" data-type="cont" draggable="true" style="padding:5px 0;font-size:15px;display:flex;align-items:center;">
                 <span class="drag-handle" style="cursor:move;margin-right:5px;">&#x2630;</span>
                 <input type="checkbox" id="useCont" ${cfg.useCont ? 'checked' : ''} style="margin-right:4px;">${t.continent}
-                <input type="text" id="continentText" value="${cfg.continentText}" style="width:60px;" placeholder="K">
+                <input type="text" id="continentText" value="${cfg.continentText}" style="width:60px;margin-left:4px;" placeholder="K">
             </div>`;
         }
         if (type === 'static') {
             return `<div class="crit-row" data-type="static" draggable="true" style="padding:5px 0;font-size:15px;display:flex;align-items:center;">
                 <span class="drag-handle" style="cursor:move;margin-right:5px;">&#x2630;</span>
                 <input type="checkbox" id="useStatic" ${cfg.useStatic ? 'checked' : ''} style="margin-right:4px;">${t.villageName}
-                <input type="text" id="staticText" value="${cfg.staticText}" style="width:120px;">
+                <input type="text" id="staticText" value="${cfg.staticText}" style="width:120px;margin-left:4px;">
             </div>`;
         }
         return '';
@@ -134,12 +136,15 @@
     function generatePreview(cfg, idx = 0) {
         var parts = [];
         cfg.order.forEach(type => {
-            if (type === 'num' && cfg.useNum)
-                parts.push(String(cfg.startNum + idx).padStart(cfg.digits || 3, '0'));
-            if (type === 'cont' && cfg.useCont && cfg.continentText)
+            if (type === 'num' && cfg.useNum) {
+                parts.push(String(cfg.startNum + idx).padStart(cfg.digits || 2, '0'));
+            }
+            if (type === 'cont' && cfg.useCont && cfg.continentText) {
                 parts.push(cfg.continentText);
-            if (type === 'static' && cfg.useStatic && cfg.staticText)
+            }
+            if (type === 'static' && cfg.useStatic && cfg.staticText) {
                 parts.push(cfg.staticText);
+            }
         });
         return parts.join(' ').trim();
     }
@@ -155,7 +160,7 @@
         gui.innerHTML = `
         <div id="falunev-atnevezo-dragbar-enter" style="cursor:move;background:#dfcca6;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #c6ae78;">
             <span style="font-size:18px;">${t.title}</span>
-            <button onclick="document.getElementById('${uniqueId}').remove()" style="font-size:16px;color:red;">×</button>
+            <button id="closeRenamerGui" style="font-size:16px;color:red;">×</button>
         </div>
         <div style="padding:16px;">
             <div id="critArea">
@@ -173,6 +178,8 @@
         </div>
         `;
         document.body.appendChild(gui);
+
+        gui.querySelector('#closeRenamerGui').addEventListener('click', () => gui.remove());
 
         let dragBar = gui.querySelector('#falunev-atnevezo-dragbar-enter');
         let offsetX = 0, offsetY = 0, dragging = false;
@@ -271,12 +278,12 @@
                     updatePreview();
                 };
                 numRow.querySelector('#startNum').onchange = function() {
-                    cfg.startNum = parseInt(this.value,10) || 1;
+                    cfg.startNum = parseInt(this.value, 10) || 1;
                     saveConfig(cfg);
                     updatePreview();
                 };
                 numRow.querySelector('#digits').onchange = function() {
-                    cfg.digits = parseInt(this.value,10) || 3;
+                    cfg.digits = parseInt(this.value, 10) || 2;
                     saveConfig(cfg);
                     updatePreview();
                 };
@@ -317,7 +324,8 @@
             gui.querySelector('#previewFaluNev').innerText = generatePreview(cfg);
         }
 
-        let enterHeld = false, idx = 0;
+        let enterHeld = false;
+        let idx = 0;
         let spans = [];
 
         document.addEventListener('keydown', function(e) {
@@ -337,7 +345,7 @@
 
         function nextRename() {
             if (!enterHeld || idx >= spans.length) {
-                gui.querySelector('#renameStatus').innerText = `${t.done} ${idx} ${normalizedLocale === 'hu_HU' ? 'falu' : ''}`.trim();
+                gui.querySelector('#renameStatus').innerText = `${t.done} ${idx} ${t.villagesWord}`;
                 return;
             }
 
@@ -378,14 +386,16 @@
                 if (input && btn) {
                     input.value = newName;
                     input.dispatchEvent(new Event('input', { bubbles: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
                     btn.click();
                     gui.querySelector('#renameStatus').innerText = `${idx + 1} ${t.renamedProgress}`;
                     idx++;
                     setTimeout(nextRename, 320);
                 } else {
                     tries++;
-                    if (tries < 20) setTimeout(waitInputAndRename, 90);
-                    else {
+                    if (tries < 20) {
+                        setTimeout(waitInputAndRename, 90);
+                    } else {
                         idx++;
                         setTimeout(nextRename, 320);
                     }
