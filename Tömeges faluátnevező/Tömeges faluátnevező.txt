@@ -5,7 +5,7 @@
         hu_HU: {
             missingVillage: 'Nem található village paraméter az URL-ben!',
             title: 'Tömeges faluátnevező',
-            numbers: 'Sorszám',
+            numbering: 'Sorszám',
             numberLength: 'Számhossz',
             continent: 'Kontinens:',
             villageName: 'Falunév:',
@@ -18,7 +18,7 @@
         en_DK: {
             missingVillage: 'Village parameter was not found in the URL!',
             title: 'Mass village renamer',
-            numbers: 'Numbers',
+            numbering: 'Numbering',
             numberLength: 'Number length',
             continent: 'Continent:',
             villageName: 'Village name:',
@@ -31,7 +31,7 @@
         en_US: {
             missingVillage: 'Village parameter was not found in the URL!',
             title: 'Mass village renamer',
-            numbers: 'Numbers',
+            numbering: 'Numbering',
             numberLength: 'Number length',
             continent: 'Continent:',
             villageName: 'Village name:',
