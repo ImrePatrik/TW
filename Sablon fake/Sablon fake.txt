@@ -1,137 +1,276 @@
 // Készítette: Patika30
 
 (function() {
+    // ---- Fordítások ----
+    var translations = {
+        hu_HU: {
+            title: "Sablon fake",
+            forumLink: "Fórum link:",
+            readCoord: "Koordináta beolvasás",
+            template: "Sablon:",
+            selectTemplate: "-- Sablon kiválasztása --",
+            noCoord: "Nincs koordináta!",
+            noInterval: "Nincs időintervallum!",
+            selectUnit: "Jelölj ki legalább 1 egységet vagy sablont!",
+            noMatch: "Nincs megfelelő koordináta az intervallumban/éjszakán kívül!",
+            coordSelected: "Koordináta: ",
+            fetchError: "Hiba a lekérésnél",
+            noTemplates: "Nincs elérhető sablon!",
+            templateApiMissing: "TroopTemplates.useTemplate nem elérhető",
+            nightBonus: "Éjszakai bónusz",
+            noNightBonus: "Éjszakai bónusz: nincs"
+        },
+        en_US: {
+            title: "Template fake",
+            forumLink: "Forum link:",
+            readCoord: "Read coordinates",
+            template: "Template:",
+            selectTemplate: "-- Select template --",
+            noCoord: "No coordinates found!",
+            noInterval: "No time interval found!",
+            selectUnit: "Select at least 1 unit or a template!",
+            noMatch: "No matching coordinate in interval/outside night bonus!",
+            coordSelected: "Coordinate: ",
+            fetchError: "Request error",
+            noTemplates: "No templates available!",
+            templateApiMissing: "TroopTemplates.useTemplate is not available",
+            nightBonus: "Night bonus",
+            noNightBonus: "Night bonus: none"
+        },
+        en_DK: {
+            title: "Template fake",
+            forumLink: "Forum link:",
+            readCoord: "Read coordinates",
+            template: "Template:",
+            selectTemplate: "-- Select template --",
+            noCoord: "No coordinates found!",
+            noInterval: "No time interval found!",
+            selectUnit: "Select at least 1 unit or a template!",
+            noMatch: "No matching coordinate in interval/outside night bonus!",
+            coordSelected: "Coordinate: ",
+            fetchError: "Request error",
+            noTemplates: "No templates available!",
+            templateApiMissing: "TroopTemplates.useTemplate is not available",
+            nightBonus: "Night bonus",
+            noNightBonus: "Night bonus: none"
+        }
+    };
+
+    function t(key) {
+        var locale = (typeof game_data !== 'undefined' && game_data.locale) ? game_data.locale : 'hu_HU';
+        var lang = translations[locale] || translations.hu_HU;
+        return lang[key] || translations.hu_HU[key] || key;
+    }
+
     // ---- Átirányítás gyülekezőhelyre, ha nem ott vagyunk ----
     var params = new URLSearchParams(window.location.search);
     if (params.get('screen') !== 'place' || params.has('mode')) {
         params.set('screen', 'place');
-        params.delete('mode'); // Töröljük a felesleges paramétert!
+        params.delete('mode');
         if (!params.has('village') && typeof game_data !== 'undefined' && game_data.village) {
             params.set('village', game_data.village.id);
         }
         window.location.search = params.toString();
         return;
     }
-    // ---- UI Setup (KH design & footer) ----
+
+    // ---- UI Setup ----
     var old = document.getElementById('kh-draggable-ui');
     if (old) old.remove();
-    var style = 'position:fixed;top:100px;left:100px;z-index:9999;' +
+
+    var box = document.createElement('div');
+    box.id = 'kh-draggable-ui';
+    box.style.cssText =
+        'position:fixed;top:100px;left:100px;z-index:9999;' +
         'padding:18px 16px 24px 16px;' +
         'background:linear-gradient(135deg,#f4ecd2 70%,#dbb875 100%);' +
         'border:2.6px solid #b28c44;' +
         'border-radius:11px;' +
         'box-shadow:0 9px 32px #865e11b0,0 1.5px 0 #7f5315 inset;' +
         'max-width:520px;';
-    var box = document.createElement('div');
-    box.setAttribute('style', style);
-    box.setAttribute('id', 'kh-draggable-ui');
+
     var prevForum = localStorage.getItem('kh_forum_link') || '';
     var prevSablonId = localStorage.getItem('kh_selected_sablon') || '';
+
     box.innerHTML = `
-      <div id="kh-dragger" style="cursor:move;font-weight:bold;padding-bottom:11px;color:#403c33;font-size:17px;text-shadow:1px 1px 0 #fff6;">Sablon fake</div>
-      <label style="color:#5c4a23;font-weight:600;">Fórum link:</label><br>
+      <div id="kh-dragger" style="cursor:move;font-weight:bold;padding-bottom:11px;color:#403c33;font-size:17px;text-shadow:1px 1px 0 #fff6;">${t('title')}</div>
+      <label style="color:#5c4a23;font-weight:600;">${t('forumLink')}</label><br>
       <input type="text" id="kh-forum" style="width:320px;background:#fff7e1;border:1.8px solid #b28c44;border-radius:4px;margin-bottom:3px;"><br>
-      <button id="kh-extract" style="margin-bottom:7px;background:#ceae74;color:#3a2e18;border:1.3px solid #8b6b29;border-radius:3px;font-weight:bold;">Koordináta beolvasás</button><br>
-      <label style="color:#5c4a23;font-weight:600;">Sablon:</label>
-      <select id="sablonvalaszto" style="margin-left:3px;margin-bottom:9px;background:#ffefc5;border:1.2px solid #b28c44;border-radius:4px;"></select>
+      <button id="kh-extract" style="margin-bottom:7px;background:#ceae74;color:#3a2e18;border:1.3px solid #8b6b29;border-radius:3px;font-weight:bold;">${t('readCoord')}</button><br>
+      <label style="color:#5c4a23;font-weight:600;">${t('template')}</label>
+      <select id="sablonvalaszto" style="margin-left:3px;margin-bottom:9px;background:#ffefc5;border:1.2px solid #b28c44;border-radius:4px;max-width:190px;"></select>
       <span id="kh-status" style="margin-left:12px;color:#287728;font-weight:600;"></span>
-      <div style="margin-top:20px;text-align:right;font-size:13px;color:#6e5c33;border-top:1px solid #d5bb83;padding-top:9px;">Készítette: Patika30</div>
+
+      <div style="margin-top:20px;border-top:1px solid #d5bb83;padding-top:9px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;">
+        <div id="kh-nightbonus" style="font-size:12px;color:#6e5c33;text-align:left;line-height:1.3;max-width:220px;"></div>
+        <div style="text-align:right;font-size:13px;color:#6e5c33;white-space:nowrap;">Készítette: Patika30</div>
+      </div>
     `;
     document.body.appendChild(box);
 
-    // -- Automatikus fórumlink betöltés -- 
     var forumInput = document.getElementById('kh-forum');
+    var sel = document.getElementById('sablonvalaszto');
+    var statusEl = document.getElementById('kh-status');
+    var nightBonusEl = document.getElementById('kh-nightbonus');
+
     forumInput.value = prevForum;
 
-    // -- Fórumlink mentése minden módosításnál -- 
     forumInput.addEventListener('input', function() {
         localStorage.setItem('kh_forum_link', forumInput.value.trim());
     });
 
-    // --- Drag ---
-    var dragger = box.querySelector('#kh-dragger'),
-        isMoving = false,
-        offsetX = 0,
-        offsetY = 0;
-    dragger.addEventListener('mousedown', function(e) {
-        isMoving = true;
-        offsetX = e.clientX - box.getBoundingClientRect().left;
-        offsetY = e.clientY - box.getBoundingClientRect().top;
-        document.body.style.userSelect = 'none';
-    });
-    document.addEventListener('mouseup', function() {
-        isMoving = false;
-        document.body.style.userSelect = '';
-    });
-    document.addEventListener('mousemove', function(e) {
-        if (isMoving) {
+    function renderNightBonus(night) {
+        if (!nightBonusEl) return;
+
+        if (!night || !night.start || !night.end) {
+            nightBonusEl.textContent = t('noNightBonus');
+            return;
+        }
+
+        nightBonusEl.textContent = t('nightBonus') + ': ' + night.start + ' - ' + night.end;
+    }
+
+    // ---- Drag ----
+    (function() {
+        var dragger = document.getElementById('kh-dragger');
+        var isMoving = false;
+        var offsetX = 0;
+        var offsetY = 0;
+
+        dragger.addEventListener('mousedown', function(e) {
+            isMoving = true;
+            offsetX = e.clientX - box.getBoundingClientRect().left;
+            offsetY = e.clientY - box.getBoundingClientRect().top;
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mouseup', function() {
+            isMoving = false;
+            document.body.style.userSelect = '';
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!isMoving) return;
             box.style.left = (e.clientX - offsetX) + 'px';
             box.style.top = (e.clientY - offsetY) + 'px';
+        });
+    })();
+
+    // ---- Sablonok ----
+    function getTemplateNodes() {
+        return document.querySelectorAll('.troop_template_selector');
+    }
+
+    function loadTemplates() {
+        if (!sel) return [];
+
+        var sablonok = [];
+        var seen = new Set();
+        sel.innerHTML = '';
+
+        var nodes = getTemplateNodes();
+        nodes.forEach(function(a) {
+            var name = (a.textContent || '').trim();
+            var id = a.getAttribute('data-template-id');
+
+            if (!id || seen.has(id)) return;
+            seen.add(id);
+            sablonok.push({ name: name, id: id });
+        });
+
+        var opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = t('selectTemplate');
+        sel.appendChild(opt0);
+
+        sablonok.forEach(function(s) {
+            var opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = s.name || s.id;
+            sel.appendChild(opt);
+        });
+
+        if (!sablonok.length) {
+            statusEl.textContent = t('noTemplates');
+        } else {
+            statusEl.textContent = '';
         }
-    });
 
-    // ---- Sablonok ---
-    var sablonok = [];
-    document.querySelectorAll('table.vis .troop_template_selector').forEach(function(a) {
-        var name = a.textContent.trim();
-        var m = a.getAttribute('onclick').match(/TroopTemplates\.useTemplate\((\d+)\)/);
-        if (m) sablonok.push({ name: name, id: m[1] });
-    });
-    var sel = document.getElementById('sablonvalaszto');
-    sel.innerHTML = '';
-    var opt0 = document.createElement('option');
-    opt0.value = '';
-    opt0.textContent = '-- Sablon kiválasztása --';
-    sel.appendChild(opt0);
-    sablonok.forEach(function(s) {
-        var opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = s.name;
-        sel.appendChild(opt);
-    });
+        return sablonok;
+    }
 
-    // Egységmaxoló logika
+    function waitForTemplates(tries, done) {
+        tries = typeof tries === 'number' ? tries : 20;
+        var list = loadTemplates();
+        if (list.length || tries <= 0) {
+            done(list);
+            return;
+        }
+        setTimeout(function() {
+            waitForTemplates(tries - 1, done);
+        }, 200);
+    }
+
     function maxolEgys(sablonId) {
+        if (!window.TroopTemplates || typeof TroopTemplates.useTemplate !== 'function') {
+            statusEl.textContent = t('templateApiMissing');
+            return;
+        }
+
         TroopTemplates.useTemplate(sablonId);
+
         setTimeout(function() {
             var form = document.forms[0];
+            if (!form) return;
+
             var unitList = ["spear", "sword", "axe", "archer", "spy", "light", "marcher", "heavy", "ram", "catapult", "knight", "snob"];
             unitList.forEach(function(unit) {
                 var input = form[unit];
                 if (!input) return;
+
                 var available = parseInt(
                     input.getAttribute('data-all-count') ||
                     input.getAttribute('data-max') ||
-                    input.parentElement.innerText.match(/\d+/)?.[0] ||
-                    "0", 10);
+                    (input.parentElement && input.parentElement.innerText.match(/\d+/) ? input.parentElement.innerText.match(/\d+/)[0] : "0"),
+                    10
+                );
+
                 var desired = parseInt(input.value, 10) || 0;
-                if (!available || available === 0) input.value = "";
-                else if (desired > available) input.value = available;
+
+                if (!available || available === 0) {
+                    input.value = "";
+                } else if (desired > available) {
+                    input.value = available;
+                }
             });
-        }, 200);
+        }, 450);
     }
 
-    // Automatikus betöltés
-    setTimeout(function() {
-        if (prevSablonId && sel.querySelector('option[value="' + prevSablonId + '"]')) {
+    waitForTemplates(20, function() {
+        if (prevSablonId && sel && sel.querySelector('option[value="' + prevSablonId + '"]')) {
             sel.value = prevSablonId;
             maxolEgys(prevSablonId);
         }
-    }, 0);
+    });
 
-    // Manuális sablonváltás
-    sel.onchange = function() {
-        var val = this.value;
-        if (!val) return;
-        localStorage.setItem('kh_selected_sablon', val);
-        maxolEgys(val);
-    };
+    if (sel) {
+        sel.addEventListener('change', function() {
+            var val = this.value;
+            if (!val) return;
+            localStorage.setItem('kh_selected_sablon', val);
+            maxolEgys(val);
+        });
+    }
 
-    // ---- XML speed/utazási idő előkészítése ----
+    // ---- XML speed/utazási idő ----
     var unitConfig = null;
 
     function fetchUnitConfig(callback) {
-        if (unitConfig) return callback(unitConfig);
+        if (unitConfig) {
+            callback(unitConfig);
+            return;
+        }
+
         $.ajax({
             url: '/interface.php?func=get_unit_info',
             dataType: 'xml',
@@ -146,71 +285,67 @@
         return parseFloat(unitConfig.find(unit + " speed").text());
     }
 
-    // ---- Koordináta beolvasás ----
-    document.getElementById('kh-extract').onclick = function() {
-        var input = document.getElementById('kh-forum').value.trim();
-        localStorage.setItem('kh_forum_link', input);
-        fetchWorldSettings(function(ws) {
-            var n = ws.night;
-            fetchUnitConfig(function() {
-                insertSmartCoord(input, n ? n.start : null, n ? n.end : null);
-            });
-        });
-    };
-
-    if (prevForum) {
-        fetchWorldSettings(function(ws) {
-            var n = ws.night;
-            fetchUnitConfig(function() {
-                insertSmartCoord(prevForum, n ? n.start : null, n ? n.end : null);
-            });
-        });
-    }
-
-    // ---- DOM-alapú éjszakai bónusz kiolvasás ----
+    // ---- Világbeállítások / éjszakai bónusz ----
     function fetchWorldSettings(callback) {
         var url = location.origin + "/page/settings";
         $.ajax({
             url: url,
             success: function(data) {
                 var html = $("<div>").html(data);
+                var labels = [
+                    "Éjszakai bónusz",
+                    "Night bonus"
+                ];
+
                 var nightRow = html.find("td").filter(function() {
-                    return $(this).text().trim() === "Éjszakai bónusz";
+                    var txt = $(this).text().trim();
+                    return labels.indexOf(txt) !== -1;
                 }).closest("tr");
+
                 var val = nightRow.find("td").eq(1).text();
-                var matchNight = val.match(/Aktív ettől:\s*(\d{1,2}:\d{2})\s*eddig:\s*(\d{1,2}:\d{2})/);
+                var matchNight = val.match(/(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/);
+
+                var nightData = matchNight ? {
+                    start: matchNight[1],
+                    end: matchNight[2]
+                } : null;
+
+                renderNightBonus(nightData);
+
                 callback({
-                    night: matchNight ? {
-                        start: matchNight[1],
-                        end: matchNight[2]
-                    } : null
+                    night: nightData
                 });
             },
             error: function() {
+                renderNightBonus(null);
                 callback({ night: null });
             }
         });
     }
 
-    // ---- Core math ----
+    // ---- Idő / matek ----
     function getServerTime() {
         var d = $("#serverDate").text().trim().split('.');
-        var t = $("#serverTime").text().trim().split(':');
-        if (d.length === 3 && t.length === 3) {
-            var dt = new Date(+d[2], +d[1] - 1, +d[0], +t[0], +t[1], +t[2]);
-            return dt;
-        } else {
-            var now = new Date();
-            var dt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), +t[0], +t[1], +t[2]);
-            return dt;
+        var tme = $("#serverTime").text().trim().split(':');
+
+        if (d.length === 3 && tme.length === 3) {
+            return new Date(+d[2], +d[1] - 1, +d[0], +tme[0], +tme[1], +tme[2]);
         }
+
+        var now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate(), +tme[0], +tme[1], +tme[2]);
     }
 
     function dateFromCustom(s) {
         var p = s.split(':');
         return new Date(
-            parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]),
-            parseInt(p[3]), parseInt(p[4]), parseInt(p[5]), parseInt(p[6])
+            parseInt(p[0], 10),
+            parseInt(p[1], 10) - 1,
+            parseInt(p[2], 10),
+            parseInt(p[3], 10),
+            parseInt(p[4], 10),
+            parseInt(p[5], 10),
+            parseInt(p[6], 10)
         );
     }
 
@@ -222,7 +357,9 @@
 
     function getSlowestUnit(form) {
         var unitList = ["spear", "sword", "axe", "archer", "spy", "light", "marcher", "heavy", "ram", "catapult", "knight", "snob"];
-        var slowestUnit = null, maxMin = 0;
+        var slowestUnit = null;
+        var maxMin = 0;
+
         unitList.forEach(function(unit) {
             var num = parseInt(form[unit] && form[unit].value, 10);
             if (num > 0) {
@@ -233,73 +370,121 @@
                 }
             }
         });
+
         return slowestUnit;
     }
 
     function inNightBonus(date, start, end) {
-        var h = date.getHours(), m = date.getMinutes();
-        var st = start.split(':').map(Number), en = end.split(':').map(Number);
-        var t = h * 60 + m, t0 = st[0] * 60 + st[1], t1 = en[0] * 60 + en[1];
+        var h = date.getHours();
+        var m = date.getMinutes();
+        var st = start.split(':').map(Number);
+        var en = end.split(':').map(Number);
+        var tme = h * 60 + m;
+        var t0 = st[0] * 60 + st[1];
+        var t1 = en[0] * 60 + en[1];
+
         if (t0 < t1) {
-            return (t >= t0 && t < t1);
-        } else {
-            return (t >= t0 || t < t1);
+            return tme >= t0 && tme < t1;
         }
+        return tme >= t0 || tme < t1;
     }
 
+    // ---- Fórum parsing ----
     function insertSmartCoord(url, nightStart, nightEnd) {
         $.ajax({
             url: url,
             success: function(result) {
                 var txt = '';
+
                 $(result).find('.post, .forum_message, .text').each(function() {
                     txt += $(this).text() + ' ';
                 });
+
                 txt = txt.replace(/(\d+),(\d+)/g, '$1|$2');
+
                 var coords = txt.match(/\d+\|\d+/g) || [];
                 var intervalRaw = txt.match(/(\d{4}:\d{2}:\d{2}:\d{1,2}:\d{2}:\d{2}:\d{3});(\d{4}:\d{2}:\d{2}:\d{1,2}:\d{2}:\d{2}:\d{3})/);
+
                 if (!coords.length) {
-                    document.getElementById('kh-status').textContent = "Nincs koordináta!";
+                    statusEl.textContent = t('noCoord');
                     return;
                 }
+
                 if (!intervalRaw) {
-                    document.getElementById('kh-status').textContent = "Nincs időintervallum!";
+                    statusEl.textContent = t('noInterval');
                     return;
                 }
-                var minArrival = dateFromCustom(intervalRaw[1]),
-                    maxArrival = dateFromCustom(intervalRaw[2]);
+
+                var minArrival = dateFromCustom(intervalRaw[1]);
+                var maxArrival = dateFromCustom(intervalRaw[2]);
                 var myCoord = game_data.village.coord;
                 var now = getServerTime();
                 var form = document.forms[0];
                 var slowestUnit = getSlowestUnit(form);
+
                 if (!slowestUnit) {
-                    document.getElementById('kh-status').textContent = "Jelölj ki legalább 1 egységet vagy sablont!";
+                    statusEl.textContent = t('selectUnit');
                     return;
                 }
+
                 var baseMinutes = getSpeedXML(slowestUnit);
                 var possible = [];
+
                 coords.forEach(function(c) {
                     var dist = distance(myCoord, c);
                     var travelMinutes = dist * baseMinutes;
                     var arrival = new Date(now.getTime() + travelMinutes * 60000);
-                    if (arrival >= minArrival && arrival <= maxArrival &&
-                        (!nightStart || !nightEnd || !inNightBonus(arrival, nightStart, nightEnd))) {
+
+                    if (
+                        arrival >= minArrival &&
+                        arrival <= maxArrival &&
+                        (!nightStart || !nightEnd || !inNightBonus(arrival, nightStart, nightEnd))
+                    ) {
                         possible.push({ coord: c, arrival: arrival });
                     }
                 });
-                if (possible.length === 0) {
-                    document.getElementById('kh-status').textContent = "Nincs megfelelő koordináta az intervallumban/éjszakán kívül!";
-                } else {
-                    var target = possible[Math.floor(Math.random() * possible.length)];
-                    var xy = target.coord.split('|');
-                    form.x.value = xy[0];
-                    form.y.value = xy[1];
-                    document.getElementById('kh-status').textContent = "Koordináta: " + target.coord;
+
+                if (!possible.length) {
+                    statusEl.textContent = t('noMatch');
+                    return;
                 }
+
+                var target = possible[Math.floor(Math.random() * possible.length)];
+                var xy = target.coord.split('|');
+
+                form.x.value = xy[0];
+                form.y.value = xy[1];
+                statusEl.textContent = t('coordSelected') + target.coord;
             },
             error: function(err) {
-                document.getElementById('kh-status').textContent = "Hiba a lekérésnél (" + err.status + "): " + err.statusText;
+                statusEl.textContent = t('fetchError') + " (" + err.status + "): " + err.statusText;
             }
+        });
+    }
+
+    // ---- Gomb ----
+    document.getElementById('kh-extract').addEventListener('click', function() {
+        var input = forumInput.value.trim();
+        localStorage.setItem('kh_forum_link', input);
+
+        fetchWorldSettings(function(ws) {
+            var n = ws.night;
+            fetchUnitConfig(function() {
+                insertSmartCoord(input, n ? n.start : null, n ? n.end : null);
+            });
+        });
+    });
+
+    // ---- Éjszakai bónusz betöltése induláskor is ----
+    fetchWorldSettings(function() {});
+
+    // ---- Automatikus futás mentett fórummal ----
+    if (prevForum) {
+        fetchWorldSettings(function(ws) {
+            var n = ws.night;
+            fetchUnitConfig(function() {
+                insertSmartCoord(prevForum, n ? n.start : null, n ? n.end : null);
+            });
         });
     }
 })();
