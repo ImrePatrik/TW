@@ -18,6 +18,54 @@ var STATS = {
 	autoSell: [0,0,0,0],
 	autoBuy: [0,0,0,0]
 };
+
+
+/* Napi automata statisztika: falunként, csak az aktuális napra. */
+function getDailyStatsDateKey() {
+	var now = new Date();
+	return now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-' + ('0' + now.getDate()).slice(-2);
+}
+function getDailyStatsStorageKey() { return 'PF_tozsde_DailyStats_' + ID; }
+function normalizeDailyStats(saved) {
+	var today = getDailyStatsDateKey();
+	if (!saved || saved.date !== today) return {date: today, autoSell: [0,0,0,0], autoBuy: [0,0,0,0]};
+	if (!Array.isArray(saved.autoSell) || saved.autoSell.length !== 4) saved.autoSell = [0,0,0,0];
+	if (!Array.isArray(saved.autoBuy) || saved.autoBuy.length !== 4) saved.autoBuy = [0,0,0,0];
+	return saved;
+}
+function loadDailyAutoStatistics() {
+	try {
+		var saved = normalizeDailyStats(JSON.parse(localStorage.getItem(getDailyStatsStorageKey())));
+		STATS.autoSell = saved.autoSell.slice();
+		STATS.autoBuy = saved.autoBuy.slice();
+		localStorage.setItem(getDailyStatsStorageKey(), JSON.stringify(saved));
+	} catch(e) { console.error('Napi statisztika betöltési hiba:', e); STATS.autoSell=[0,0,0,0]; STATS.autoBuy=[0,0,0,0]; }
+}
+function saveDailyAutoStatistics() {
+	try { localStorage.setItem(getDailyStatsStorageKey(), JSON.stringify({date:getDailyStatsDateKey(),autoSell:STATS.autoSell.slice(),autoBuy:STATS.autoBuy.slice()})); }
+	catch(e) { console.error('Napi statisztika mentési hiba:', e); }
+}
+function ensureCurrentDailyAutoStatistics() {
+	try {
+		var saved = JSON.parse(localStorage.getItem(getDailyStatsStorageKey()));
+		if (!saved || saved.date !== getDailyStatsDateKey()) { STATS.autoSell=[0,0,0,0]; STATS.autoBuy=[0,0,0,0]; saveDailyAutoStatistics(); updateAutoStatisticTable(); }
+	} catch(e) { console.error('Napi statisztika dátumellenőrzési hiba:', e); }
+}
+
+/* Csak az aktuális scriptindítás futásideje; oldal/szkript újraindításakor nullázódik. */
+var BOT_RUN_STARTED_AT = Date.now();
+function formatBotRunTime(milliseconds) {
+	var totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+	var hours = Math.floor(totalSeconds / 3600);
+	var minutes = Math.floor((totalSeconds % 3600) / 60);
+	var seconds = totalSeconds % 60;
+	return ('0' + hours).slice(-2) + ':' + ('0' + minutes).slice(-2) + ':' + ('0' + seconds).slice(-2);
+}
+function updateBotRunTimer() {
+	var timer = document.getElementById('botRunTimer');
+	if (timer) timer.innerText = 'Bot futásideje: ' + formatBotRunTime(Date.now() - BOT_RUN_STARTED_AT);
+}
+
 var TOZSDE_DATA = {
 };
 var TOZSDE_DATA_DEFAULT = {
@@ -227,7 +275,6 @@ function createWorker(main){
 	return new Worker(window.URL.createObjectURL(blob));
 }
 
-
 function generateAutoOptions(mode) {
 	var res=['wood', 'stone', 'iron'];
 	var str = `<div class="autoChk mode-${mode}">`;
@@ -435,13 +482,14 @@ let tozsdeStyle_el = document.createElement('style');
 tozsdeStyle_el.textContent = tozsdeStyle;
 document.head.appendChild(tozsdeStyle_el);
 document.body.innerHTML = '<h1 align="center" style="cursor: context-menu;text-shadow: 3px 3px 4px #666; margin-top:10px;">Prémium Tőzsde kezelő ('+ID+')</h1>\
+<div id="botRunTimer" style="position:fixed; bottom:42px; right:15px; font-size:15px; font-weight:bold; color:#555; z-index:10000; text-align:right;"></div>\
 <div id="serverClock" style="position:fixed; bottom:10px; right:15px; font-size:24px; font-weight:bold; color:gray; z-index:10000;"></div>\
 <h4 style="text-align: center; margin-top:0;">'+game_data.player.name+' ('+game_data.village.display_name+')</h4>\
 <form id="cnc_tozsde">\
 <h3 align="center" onclick="setTabVisibility(\'h3_2\', this)">Automatika beállítása</h3>\
 <div id="h3_2" style="display:none">\
 <p class="warning-text">FIGYELEM! Az automatika kiemelten figyelt terület, könnyen bann járhat használatáért!</p>\
-<span class="auto-sugo"><a target="_BLANK" href="https://github.com/cncDAni2/klanhaboru/blob/main/images/tozsde/automata_sugo.png?raw=true">Súgó/példakép betanításhoz</a></span>\
+<span class="auto-sugo"><a target="_BLANK" href="https://raw.githubusercontent.com/ImrePatrik/TW/refs/heads/main/Lop%C3%B3sbot/csohi%20kapd%20be.jpg?raw=true">Súgó/példakép betanításhoz</a></span>\
 <table class="vis" style="margin: auto; border-collapse: collapse;" id="tozsde_auto">\
 <tr><th colspan="2">Automatika tanítása</th><th><span class="icon header wood"> </span> <button type="button" onclick="copyAuto(0)">=</button></th><th><span class="icon header stone"> </span>  <button type="button" onclick="copyAuto(1)">=</button></th><th><span class="icon header iron"> </span> <button type="button" onclick="copyAuto(2)">=</button></th></tr>\
 <tr><td rowspan="4" style="text-align:center; border-right: 2px solid #F88"><span class="quickAction" onclick="quickAuto(\'sell\')">Nyerseladás</span> '+generateAutoOptions('sell')+'</td><td><span class="icon header premium"> </span> Minimum limit '+generatePlusMinus("sell","minLimit")+'</td><td><input type="number" name="auto_sell_wood_minLimit"></td><td><input type="number" name="auto_sell_stone_minLimit"></td><td><input type="number" name="auto_sell_iron_minLimit"></td></tr>\
@@ -453,7 +501,7 @@ document.body.innerHTML = '<h1 align="center" style="cursor: context-menu;text-s
 <tr><td><span class="icon header ressources"> </span> Minimum limit tartása</td><td><input type="number" name="auto_buy_wood_minRes"></td><td><input type="number" name="auto_buy_stone_minRes"></td><td><input type="number" name="auto_buy_iron_minRes"></td></tr>\
 <tr><td><span class="icon header premium"> </span> Maximum limit '+generatePlusMinus("buy","maxLimit")+'</td><td><input type="number" name="auto_buy_wood_maxLimit"></td><td><input type="number" name="auto_buy_stone_maxLimit"></td><td><input type="number" name="auto_buy_iron_maxLimit"></td></tr>\
 <tr><td><span class="icon header ressources"> </span> Maximum nyers a faluban</td><td><input type="number" name="auto_buy_wood_maxRes"></td><td><input type="number" name="auto_buy_stone_maxRes"></td><td><input type="number" name="auto_buy_iron_maxRes"></td></tr>\
-<tr style="border-top: 1px solid #F88"><td colspan="2" style="text-align:center"><strong>Vásárlási prioritás</strong><br><small>Ha több nyersanyag is vehető, ezt a sorrendet követi</small></td><td colspan="3" style="text-align:center">1. <select name="buy_priority_1"><option value="wood">Fa</option><option value="stone">Kő</option><option value="iron">Vas</option></select> &nbsp; 2. <select name="buy_priority_2"><option value="wood">Fa</option><option value="stone">Kő</option><option value="iron">Vas</option></select> &nbsp; 3. <select name="buy_priority_3"><option value="wood">Fa</option><option value="stone">Kő</option><option value="iron">Vas</option></select></td></tr>\
+<tr style="border-top: 1px solid #F88"><td colspan="2" style="text-align:center"><strong>Vásárlási prioritás</strong><br><small>Ha több nyersanyag is vehető, ezt a sorrendet követi</small></td><td colspan="3" style="text-align:center">1. <select name="buy_priority_1"><option value="wood">Gally</option><option value="stone">Kő</option><option value="iron">Műanyag</option></select> &nbsp; 2. <select name="buy_priority_2"><option value="wood">Gally</option><option value="stone">Kő</option><option value="iron">Műanyag</option></select> &nbsp; 3. <select name="buy_priority_3"><option value="wood">Gally</option><option value="stone">Kő</option><option value="iron">Műanyag</option></select></td></tr>\
 </table>\
 <div style="width:500px; text-align:center;margin:10px auto"><img src="/graphic/buildings/market.png"> Automata által meghagyott kereskedők: <input type="number" name="left_merch" value="0"></div></div>\
 \
@@ -470,12 +518,13 @@ document.body.innerHTML = '<h1 align="center" style="cursor: context-menu;text-s
 </p></div>\
 <div style="width:800px; text-align:center;margin:10px auto"><button type="button" onclick="loadData();">Visszaállítás</button> <button type="button" id="auto_save" onclick="saveAuto()">Automata beállításainak alkalmazása</button></div></form>\
 <h3 align="center" class="openedH3" onclick="setTabVisibility(\'h3_4\', this)">Árfolyam alakulása</h3>\
-<div id="h3_4"><table id="cnc_stats"><tr><th>Statisztika</th><th><span class="icon header wood"> </span></th><th><span class="icon header stone"> </span></th><th><span class="icon header iron"> </span></th><th><span class="icon header premium"> </span></th></tr>\
+<div id="h3_4"><table id="cnc_stats"><tr><th>Napi statisztika</th><th><span class="icon header wood"> </span></th><th><span class="icon header stone"> </span></th><th><span class="icon header iron"> </span></th><th><span class="icon header premium"> </span></th></tr>\
 <tr><td>Legkisebb észlelt ár</td><td>0</td><td>0</td><td>0</td><td></td></tr>\
 <tr><td>Legmagasabb észlelt ár</td><td>0</td><td>0</td><td>0</td><td></td></tr>\
 <tr><td>Idő alapú átlag</td><td>-</td><td>-</td><td>-</td><td></td></tr>\
 <tr><td>Automata által eladott</td> <td>0</td><td>0</td><td>0</td><td>0</td></tr>\
 <tr><td>Automata által vásárolt</td><td>0</td><td>0</td><td>0</td><td>0</td></tr></table>\
+<div id="dailyStatsDate" style="text-align:center;font-size:11px;color:#444"></div>\
 <div id="allapot" style="background-color: #622; margin: auto; width: 690px; padding: 0 15px; color: white; height: 300px; overflow: auto;">\
 <table><thead style="color: black"><tr><th rowspan="2" style="width: 60px">Dátum</th><th colspan="3" style="width: 200px">Arány 1 <span class="icon header premium"> </span> &LeftArrowRightArrow;</th><th colspan="3" style="width: 250px">Készlet</th><th rowspan="2" style="width:150px">Értesítés</th></tr>\
 <tr><th class="header50" style="text-align: center"><span class="icon header wood"> </span></th><th class="header50"><span class="icon header stone"> </span></th><th class="header50"><span class="icon header iron"> </span></th>\
@@ -773,6 +822,8 @@ function updateServerClock() {
 }
 
 setInterval(updateServerClock, 1000);
+updateBotRunTimer();
+setInterval(updateBotRunTimer, 1000);
 
 
 
@@ -801,22 +852,23 @@ function updateStatistic(newValues, lastValues) {
 		}
 	}
 }
-function updateAutoStatistic(mode, type, resValue, ppValue) {
-	// mode type sellValue
+function updateDailyStatsDateLabel() {
+	var el = document.getElementById('dailyStatsDate');
+	if (el) el.innerHTML = 'Napi összesítés: ' + getDailyStatsDateKey();
+}
+function updateAutoStatisticTable() {
+	updateDailyStatsDateLabel();
 	var x = document.getElementById("cnc_stats");
-	var resIndex = 0;
-	if (type=="stone") resIndex=1; if (type=="iron") resIndex=2;
-	if (mode=="sell") {
-		STATS.autoSell[resIndex]+=resValue;
-		STATS.autoSell[3]+=ppValue;
-	} else {
-		STATS.autoBuy[resIndex]+=resValue;
-		STATS.autoBuy[3]+=ppValue;
-	}
-	for (var i=0;i<4;i++) {
-		x.rows[4].cells[i+1].innerHTML = STATS.autoSell[i];
-		x.rows[5].cells[i+1].innerHTML = STATS.autoBuy[i];
-	}
+	if (!x) return;
+	for (var i=0;i<4;i++) { x.rows[4].cells[i+1].innerHTML=STATS.autoSell[i]; x.rows[5].cells[i+1].innerHTML=STATS.autoBuy[i]; }
+}
+function updateAutoStatistic(mode, type, resValue, ppValue) {
+	ensureCurrentDailyAutoStatistics();
+	var resIndex=0; if(type=="stone") resIndex=1; if(type=="iron") resIndex=2;
+	if(mode=="sell") { STATS.autoSell[resIndex]+=resValue; STATS.autoSell[3]+=ppValue; }
+	else { STATS.autoBuy[resIndex]+=resValue; STATS.autoBuy[3]+=ppValue; }
+	saveDailyAutoStatistics();
+	updateAutoStatisticTable();
 }
 
 /**
@@ -1360,6 +1412,7 @@ function main() {try{
 	next = 1000;
 	if (EVENT.agressiveRefresh) next = 150 + (Math.random() * 100);
 	if (!BOT){
+		ensureCurrentDailyAutoStatistics();
 	switch(STATUS) {
 		case 1: HIBA = 0; windowOperation('open'); STATUS = 2; next = 1333; break;
 		case 2: if (isPageLoaded(REF)) {
@@ -1412,6 +1465,9 @@ function autoMotor() {try{
 }catch(e) {console.error(e); resetAutoState(); }}
 
 loadData();
+loadDailyAutoStatistics();
+updateAutoStatisticTable();
+updateBotRunTimer();
 loadDiscordBotProtectionSettings();
 addDiscordBotProtectionPanel();
 
