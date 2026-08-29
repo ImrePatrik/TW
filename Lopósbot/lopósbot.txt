@@ -1,6 +1,63 @@
 var REF, STATUS = 1, HIBA = 0, AUTO_STATUS=0;
 var NEWMAIL=0;
 var AUTO_MOTOR_DELAYER = null;
+
+
+/* Bot kézi szüneteltetése. A választás falvanként megmarad. */
+var BOT_PAUSED = false;
+function getBotPauseStorageKey() {
+	return 'PF_tozsde_BotPaused_' + ID;
+}
+function loadBotPauseState() {
+	try {
+		BOT_PAUSED = localStorage.getItem(getBotPauseStorageKey()) === '1';
+	} catch (error) {
+		console.error('Bot szünet állapot betöltési hiba:', error);
+		BOT_PAUSED = false;
+	}
+}
+function saveBotPauseState() {
+	try {
+		localStorage.setItem(getBotPauseStorageKey(), BOT_PAUSED ? '1' : '0');
+	} catch (error) {
+		console.error('Bot szünet állapot mentési hiba:', error);
+	}
+}
+function updateBotPauseButton() {
+	var button = document.getElementById('botPauseButton');
+	var status = document.getElementById('botPauseStatus');
+	if (!button) return;
+	button.textContent = BOT_PAUSED ? '▶ Bot indítása' : '❚❚ Bot szüneteltetése';
+	button.style.background = BOT_PAUSED ? '#4d8f42' : '#a9473b';
+	button.style.borderColor = BOT_PAUSED ? '#2e5e28' : '#68261f';
+	button.title = BOT_PAUSED ? 'A bot újraindítása' : 'A bot azonnali szüneteltetése';
+	if (status) status.textContent = BOT_PAUSED ? 'Állapot: SZÜNETEL' : 'Állapot: FUT';
+}
+function toggleBotPause() {
+	BOT_PAUSED = !BOT_PAUSED;
+	saveBotPauseState();
+	updateBotPauseButton();
+	if (BOT_PAUSED) {
+		AUTO_STATUS = 0;
+		if (typeof TOZSDE_AUTOINFO !== 'undefined') {
+			TOZSDE_AUTOINFO.inProgress = false;
+			TOZSDE_AUTOINFO.isError = false;
+		}
+		if (typeof addEvent === 'function') addEvent('A bot kézzel szüneteltetve. A tőzsdeablak nyitva marad.', 'info');
+	} else {
+		if (typeof addEvent === 'function') addEvent('A bot újra elindítva.', 'info');
+	}
+}
+function addBotPauseButton() {
+	if (document.getElementById('botPausePanel')) return;
+	var panel = document.createElement('div');
+	panel.id = 'botPausePanel';
+	panel.style.cssText = 'position:fixed;left:15px;bottom:15px;z-index:10001;background:rgba(245,230,190,.96);border:1px solid #5b3b1c;border-radius:6px;padding:8px;box-shadow:0 2px 6px rgba(0,0,0,.35);font-family:Verdana,Arial,sans-serif;text-align:center;';
+	panel.innerHTML = '<button type="button" id="botPauseButton" style="color:#fff;font-weight:bold;cursor:pointer;padding:7px 10px;border:2px solid;border-radius:4px;font-size:12px;"></button><div id="botPauseStatus" style="margin-top:5px;font-size:11px;font-weight:bold;"></div>';
+	document.body.appendChild(panel);
+	document.getElementById('botPauseButton').addEventListener('click', toggleBotPause);
+	updateBotPauseButton();
+}
 document.body.style.backgroundImage="none";
 document.body.style.background="#e3d5b3 url(https://dshu.innogamescdn.com/asset/233cdec1/graphic/index/main_bg.jpg) scroll right top repeat";
 var ID=game_data.world+" - K" + (game_data.village.y+'')[0] + (game_data.village.x+'')[0];
@@ -122,6 +179,58 @@ var ISTOZSDE_AUTO = {
 	stone: {},
 	iron: {}
 };
+
+function loadAutoEnabledStates() {
+    try {
+        var saved = JSON.parse(
+            localStorage.getItem('PF_tozsde_AutoEnabled_' + ID)
+        );
+
+        if (!saved) return;
+
+        var resources = ['wood', 'stone', 'iron'];
+
+        for (var i = 0; i < resources.length; i++) {
+            var resource = resources[i];
+
+            ISTOZSDE_AUTO[resource].sell =
+                saved[resource] &&
+                saved[resource].sell === true;
+
+            ISTOZSDE_AUTO[resource].buy =
+                saved[resource] &&
+                saved[resource].buy === true;
+        }
+    } catch (error) {
+        console.error('Automata pipa betöltési hiba:', error);
+    }
+}
+
+function applyAutoEnabledCheckboxes() {
+    var resources = ['wood', 'stone', 'iron'];
+
+    var sellCheckboxes = document.querySelectorAll(
+        '.mode-sell input[type="checkbox"]'
+    );
+
+    var buyCheckboxes = document.querySelectorAll(
+        '.mode-buy input[type="checkbox"]'
+    );
+
+    for (var i = 0; i < resources.length; i++) {
+        var resource = resources[i];
+
+        if (sellCheckboxes[i]) {
+            sellCheckboxes[i].checked =
+                ISTOZSDE_AUTO[resource].sell === true;
+        }
+
+        if (buyCheckboxes[i]) {
+            buyCheckboxes[i].checked =
+                ISTOZSDE_AUTO[resource].buy === true;
+        }
+    }
+}
 
 var BUY_PRIORITY_DEFAULT = ['wood', 'stone', 'iron'];
 var BUY_PRIORITY = BUY_PRIORITY_DEFAULT.slice();
@@ -516,7 +625,7 @@ document.body.innerHTML = '<h1 align="center" style="cursor: context-menu;text-s
 	<input type="checkbox" onclick="setAgressiveRefresh2(this)"><strong>GYORS REAGÁLÁS</strong> (nem ajánlott)<br>\
 	Minimum tranzakció / kereskedés: <input type="integer" name="minTransAmount" onblur="setMinTrans(this)" value="1800"> nyersanyag \
 </p></div>\
-<div style="width:800px; text-align:center;margin:10px auto"><button type="button" onclick="loadData();">Visszaállítás</button> <button type="button" id="auto_save" onclick="saveAuto()">Automata beállításainak alkalmazása</button></div></form>\
+<div style="width:800px; text-align:center;margin:10px auto"><button type="button" onclick="loadData();">Visszaállítás</button> </div></form>\
 <h3 align="center" class="openedH3" onclick="setTabVisibility(\'h3_4\', this)">Árfolyam alakulása</h3>\
 <div id="h3_4"><table id="cnc_stats"><tr><th>Napi statisztika</th><th><span class="icon header wood"> </span></th><th><span class="icon header stone"> </span></th><th><span class="icon header iron"> </span></th><th><span class="icon header premium"> </span></th></tr>\
 <tr><td>Legkisebb észlelt ár</td><td>0</td><td>0</td><td>0</td><td></td></tr>\
@@ -713,7 +822,11 @@ function isPageLoaded(ref){try{
 return false;}
 
 function stopStartAuto(el, mode, resType) {
-	ISTOZSDE_AUTO[resType][mode] = el.checked;
+    ISTOZSDE_AUTO[resType][mode] = el.checked === true;
+    localStorage.setItem(
+        'PF_tozsde_AutoEnabled_' + ID,
+        JSON.stringify(ISTOZSDE_AUTO)
+    );
 }
 function saveAuto() {
 	var x = document.getElementById('cnc_tozsde'), tmp;
@@ -793,7 +906,9 @@ function loadData() {
 		BUY_PRIORITY = Array.isArray(TOZSDE_AUTO.buyPriority) && TOZSDE_AUTO.buyPriority.length===3 && new Set(TOZSDE_AUTO.buyPriority).size===3 ? TOZSDE_AUTO.buyPriority.slice() : BUY_PRIORITY_DEFAULT.slice();
 	}
 	setBuyPriorityForm(BUY_PRIORITY);
-	setButtonBack('auto_save');
+
+	loadAutoEnabledStates();
+	applyAutoEnabledCheckboxes();
 }
 
 function prettyDatePrint(m){
@@ -1411,7 +1526,7 @@ function tozsdekereses() {try{
 function main() {try{
 	next = 1000;
 	if (EVENT.agressiveRefresh) next = 150 + (Math.random() * 100);
-	if (!BOT){
+	if (!BOT && !BOT_PAUSED){
 		ensureCurrentDailyAutoStatistics();
 	switch(STATUS) {
 		case 1: HIBA = 0; windowOperation('open'); STATUS = 2; next = 1333; break;
@@ -1471,6 +1586,9 @@ updateBotRunTimer();
 loadDiscordBotProtectionSettings();
 addDiscordBotProtectionPanel();
 
+loadBotPauseState();
+addBotPauseButton();
+
 // A kezelőlap felépült; innentől a korábban megnyitott külön tőzsdelapot kezeljük.
 if (EARLY_MARKET_REF && !EARLY_MARKET_REF.closed) REF = EARLY_MARKET_REF;
 
@@ -1478,13 +1596,7 @@ setTimeout(() => main(), 100);
 
 // Szándékosan meghagyva: elhagyási figyelmeztetés.
 window.onbeforeunload = function() {return true;}
-$('#h3_2').on('change', 'input:not([type="checkbox"]), select', function() { //Automata
-	var butt = document.getElementById("auto_save");
-	if (butt.disabled!==false) {
-		butt.disabled = false;
-		butt.innerHTML = butt.innerHTML+'*';
-	}
-});
+
 
 /*
  BUG: Dupla vásárlás van. Néha. (Lehet jobb is?) Nem a kerekítés miatt? BUY-nál FEL kéne kerekítani, de amúgyis a current_price kéne hogy megmondja a kerekítést
