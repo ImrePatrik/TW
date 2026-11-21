@@ -144,7 +144,7 @@
         },
 
         en: {
-            title: "Map village groups",
+            title: "Map Group Helper",
             alreadyOpen: "Close the existing Map village groups popup first.",
             openMap: "Open the map before running this script.",
             close: "Close",
