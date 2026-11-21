@@ -1,10 +1,4 @@
 // Készítette: Patika30
-// Térképes csoportsegéd magyar és angol felülettel.
-// Eredeti krémes–aranybarna színvilág.
-// Találatszám közvetlenül a kereső alatt.
-// Szűrőleírások beolvasása ideiglenes iframe segítségével.
-// Térképes kiemelést kizárólag a Hozzáadás / Add gomb küld be.
-// A script használatának szerveroldali engedélyezése nem vélelmezett.
 
 (async function () {
     "use strict";
