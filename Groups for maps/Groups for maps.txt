@@ -1,5 +1,7 @@
 // Készítette: Patika30
 // Térképes csoportsegéd magyar és angol felülettel.
+// Eredeti krémes–aranybarna színvilág.
+// Találatszám közvetlenül a kereső alatt.
 // Szűrőleírások beolvasása ideiglenes iframe segítségével.
 // Térképes kiemelést kizárólag a Hozzáadás / Add gomb küld be.
 // A script használatának szerveroldali engedélyezése nem vélelmezett.
@@ -23,57 +25,78 @@
             alreadyOpen: "Előbb zárd be a meglévő csoportsegédet.",
             openMap: "A scriptet a térképen indítsd el.",
             close: "Bezárás",
+
             info:
                 "A névre kattintva megtekintheted a szűrőket. " +
                 "A Hozzáadás gomb egy térképes kiemelést küld be.",
+
             search: "Csoportok keresése...",
             refresh: "Térkép frissítése",
             author: "Készítette: Patika30",
             add: "Hozzáadás",
             dynamicGroup: "Dinamikus csoport",
+
             defaultLogic:
                 "Minden aktív feltételnek teljesülnie kell, " +
                 "a játék kontinens-, bónusz- és zászlófeltételekre " +
                 "vonatkozó VAGY-kivételeivel.",
+
             customLogic:
                 "Egyéni feltételkombinációk aktívak. Az alábbi lista " +
                 "nem jeleníti meg a teljes logikai kifejezést.",
+
             noConditions: "Nem találtunk aktív feltételt.",
             openDefinition: "Eredeti szűrődefiníció megnyitása »",
             loadingDefinition: "Az inicializált szűrőoldal betöltése...",
+
             loadingGroup:
                 "„{name}” betöltése ideiglenes iframe-ben...\n" +
                 "Az olvasó nem ment és nem módosít szűrőket.",
+
             filtersLoaded:
                 "„{name}” szűrői betöltve.\n" +
                 "A kézi csoporttagságot az inicializált legördülőkből " +
                 "olvastuk ki. Az ideiglenes iframe eltávolítva.",
+
             definitionFailed:
                 "A szűrődefiníció nem tölthető be. " +
                 "Az ideiglenes iframe eltávolítva. " +
                 "Nem történt automatikus újrapróbálás.",
+
             submitting: "„{name}” beküldése...",
+
             submitted:
                 "„{name}” beküldve és eltávolítva ebből a listából.\n" +
                 "A mentést külön nem ellenőriztük. Az eredmény " +
                 "ellenőrzéséhez frissítsd a térképet.",
+
             retryWarning:
                 "{message}\nNem történt automatikus újrapróbálás. " +
                 "Újabb beküldés előtt frissítsd a térképet.",
+
             reloading: "Térkép újratöltése...",
+
             wait:
                 "Várd meg a folyamatban lévő művelet végét. " +
                 "A szűrőbetöltés legfeljebb 20 másodpercig vár.",
+
             loadingList: "A térképes csoportlista betöltése...",
+
             ready:
                 "A csoport nevére kattintva olvashatod a szűrőket.\n" +
                 "Csak a Hozzáadás gomb küld be térképes módosítást.",
-            count: "{total} csoport · {submitted} beküldve",
-            searchCount:
-                "{visible} találat / {total} csoport · {submitted} beküldve",
+
+            count: "{total} csoport",
+            searchCount: "{visible} találat / {total} csoport",
+            submittedCount: "{submitted} beküldve",
+
             empty: "Nincs több csoport ebben a listában.",
             noResults: "Nincs a keresésnek megfelelő csoport.",
-            login: "Bejelentkezés vagy ellenőrzés szükséges. Nézd meg a játékoldalt.",
+
+            login:
+                "Bejelentkezés vagy ellenőrzés szükséges. " +
+                "Nézd meg a játékoldalt.",
+
             redirect: "Váratlan átirányítás.",
             jsonMalformed: "Hibás JSON-adat: {property}.",
             jsonInvalid: "A(z) {property} nem érvényes JSON.",
@@ -82,29 +105,41 @@
             wrongGroup: "A szerver egy másik csoport definícióját adta vissza.",
             badFilterData: "A mentett szűrőadatok formátuma nem támogatott.",
             badFilterType: "Nem támogatott szűrőformátum: {type}.",
+
             frameTitle: "Ideiglenes szűrőolvasó",
             frameInitializing: "A szűrőoldal inicializálása nem fejeződött be.",
+
             frameFailed:
                 "A szűrőoldal nem tölthető be iframe-ben. " +
                 "Nyisd meg az eredeti szűrődefiníciót.",
+
             frameUnavailable: "A beágyazott dokumentum nem érhető el.",
+
             frameNoForm:
                 "Nem található dinamikus szűrőűrlap. " +
                 "Ez lehet kézi csoport vagy nem támogatott oldal.",
+
             frameManualWaiting:
                 "A beágyazott oldal még nem jelenítette meg az összes " +
                 "aktív kézicsoport-legördülőt.",
+
             frameControlsWaiting: "A szűrővezérlők még nem jelentek meg.",
+
             frameTimeout:
                 "{message} A játék esetleg tiltja a beágyazást. " +
                 "Nyisd meg az eredeti szűrődefiníciót.",
+
             frameReadError:
                 "Az inicializált szűrőoldal nem olvasható: {message}",
+
             badMapAction: "Váratlan térképes űrlapművelet.",
+
             noMapForm:
                 "Nyisd meg a térképen a saját csoport hozzáadását, " +
                 "majd zárd be ezt a panelt és indítsd újra a scriptet.",
+
             noMapSelect: "Nem található a térképes csoportválasztó.",
+
             memberOf: "Tagja ennek",
             notMemberOf: "Nem tagja ennek",
             noManualMembership: "Nincs kézzel beállított csoporttagsága",
@@ -119,53 +154,70 @@
             alreadyOpen: "Close the existing Map village groups popup first.",
             openMap: "Open the map before running this script.",
             close: "Close",
+
             info:
                 "Click a name to view its filters. " +
                 "Click Add to submit one map highlight.",
+
             search: "Search groups...",
             refresh: "Refresh map",
             author: "Made by: Patika30",
             add: "Add",
             dynamicGroup: "Dynamic group",
+
             defaultLogic:
                 "All active conditions must match, with the game's OR " +
                 "exceptions for listed continents, bonuses and flags.",
+
             customLogic:
                 "Custom combinations enabled. Conditions below do not " +
                 "show their complete Boolean expression.",
+
             noConditions: "No active conditions were found.",
             openDefinition: "Open original filter definition »",
             loadingDefinition: "Loading initialized filter page...",
+
             loadingGroup:
                 'Loading "{name}" in a temporary iframe...\n' +
                 "The reader does not submit filter changes.",
+
             filtersLoaded:
                 '"{name}" filters loaded.\n' +
                 "Manual-group descriptions were read from the " +
                 "initialized dropdowns. The temporary iframe was removed.",
+
             definitionFailed:
                 "Could not load the definition. " +
                 "The temporary iframe was removed. " +
                 "No automatic retry was made.",
+
             submitting: 'Submitting "{name}"...',
+
             submitted:
                 '"{name}" submitted and removed from this list.\n' +
                 "Persistence has not been independently verified. " +
                 "Refresh the map to check the result.",
+
             retryWarning:
                 "{message}\nNo automatic retry was made. " +
                 "Refresh the map before retrying.",
+
             reloading: "Reloading the map...",
+
             wait:
                 "Wait for the current operation to finish. " +
                 "Filter loading times out after 20 seconds.",
+
             loadingList: "Loading map group list...",
+
             ready:
                 "Click a group name to read its filters.\n" +
                 "Only Add submits a map-highlight change.",
-            count: "{total} groups · {submitted} submitted",
-            searchCount:
-                "{visible} matches / {total} groups · {submitted} submitted",
+
+            count: "{total} groups",
+            searchCount: "{visible} matches / {total} groups",
+            submittedCount: "{submitted} submitted",
+
             empty: "No groups remaining in this list.",
             noResults: "No groups match your search.",
             login: "Login or verification required. Check the game page.",
@@ -177,29 +229,41 @@
             wrongGroup: "The server returned a different group's definition.",
             badFilterData: "Unexpected saved-filter data format.",
             badFilterType: 'Unsupported saved-filter format for "{type}".',
+
             frameTitle: "Temporary group filter reader",
             frameInitializing: "The filter page did not finish initializing.",
+
             frameFailed:
                 "The filter page could not be loaded in a frame. " +
                 "Open the original filter definition.",
+
             frameUnavailable: "The embedded document is unavailable.",
+
             frameNoForm:
                 "No dynamic filter form was found. " +
                 "This may be a manual group or an unsupported page.",
+
             frameManualWaiting:
                 "The embedded page has not rendered all active " +
                 "manual-group dropdowns.",
+
             frameControlsWaiting: "The filter controls have not rendered.",
+
             frameTimeout:
                 "{message} The game may block embedded pages. " +
                 "Open the original filter definition to check.",
+
             frameReadError:
                 "Could not read the initialized filter page: {message}",
+
             badMapAction: "Unexpected map form action.",
+
             noMapForm:
                 'Open "Add own group" on the map, then close this popup ' +
                 "and run the script again.",
+
             noMapSelect: "Map group dropdown not found.",
+
             memberOf: "Member of",
             notMemberOf: "Not a member of",
             noManualMembership: "No manually-set membership",
@@ -260,17 +324,24 @@
             top:50%;
             transform:translate(-50%,-50%);
             z-index:2147483647;
+
             width:510px;
             max-width:calc(100vw - 28px);
             max-height:calc(100vh - 28px);
+
             display:flex;
             flex-direction:column;
             overflow:hidden;
+
             color:#403c33;
             background:linear-gradient(135deg,#f4ecd2 70%,#dbb875 100%);
             border:2.6px solid #b28c44;
             border-radius:11px;
-            box-shadow:0 9px 32px #865e11b0,inset 0 1.5px 0 #7f5315;
+
+            box-shadow:
+                0 9px 32px #865e11b0,
+                inset 0 1.5px 0 #7f5315;
+
             font:13px -apple-system,BlinkMacSystemFont,
                 "Segoe UI",Verdana,Arial,sans-serif;
             line-height:1.5;
@@ -283,10 +354,22 @@
             to { opacity:1; }
         }
 
-        #${ID}, #${ID} * { box-sizing:border-box; }
-        #${ID} [hidden] { display:none !important; }
-        #${ID} button, #${ID} input { font-family:inherit; }
-        #${ID} button { -webkit-tap-highlight-color:transparent; }
+        #${ID}, #${ID} * {
+            box-sizing:border-box;
+        }
+
+        #${ID} [hidden] {
+            display:none !important;
+        }
+
+        #${ID} button,
+        #${ID} input {
+            font-family:inherit;
+        }
+
+        #${ID} button {
+            -webkit-tap-highlight-color:transparent;
+        }
 
         #${ID} button:focus-visible,
         #${ID} input:focus-visible,
@@ -302,11 +385,14 @@
             justify-content:space-between;
             flex-shrink:0;
             gap:16px;
+
             margin:0;
             padding:20px 22px;
+
             background:linear-gradient(135deg,#f4ecd2 70%,#e5c990 100%);
             border-bottom:1px solid #d5bb83;
             box-shadow:inset 0 1px 0 #fff6;
+
             cursor:move;
             user-select:none;
             touch-action:none;
@@ -354,10 +440,12 @@
             width:32px;
             height:32px;
             padding:0;
+
             color:#5c4a23;
             background:#ead7ad;
             border:1px solid #b28c44;
             border-radius:6px;
+
             font:400 24px Arial,sans-serif;
             line-height:1;
             cursor:pointer;
@@ -387,23 +475,42 @@
             display:block;
             width:100%;
             height:43px;
-            margin:15px 0 16px;
+
+            margin:15px 0 0;
             padding:10px 14px;
+
             color:#403c33;
             background:#fff7e1;
             border:1.8px solid #b28c44;
             border-radius:6px;
             box-shadow:inset 0 1px 3px #865e1110;
+
             font-size:13px;
             transition:border-color .15s,box-shadow .15s;
         }
 
-        #${ID} .p-search::placeholder { color:#9a8559; }
+        #${ID} .p-search::placeholder {
+            color:#9a8559;
+        }
 
         #${ID} .p-search:focus {
             outline:none;
             border-color:#8b6b29;
-            box-shadow:inset 0 1px 3px #865e1110,0 0 0 3px #b28c4426;
+            box-shadow:
+                inset 0 1px 3px #865e1110,
+                0 0 0 3px #b28c4426;
+        }
+
+        #${ID} .p-search-count {
+            margin:0 2px 12px;
+            padding:8px 0 10px;
+
+            color:#806c42;
+            border-bottom:1px solid #d5bb83;
+
+            font-size:11px;
+            line-height:1.5;
+            font-variant-numeric:tabular-nums;
         }
 
         #${ID} .p-list {
@@ -415,7 +522,9 @@
             scrollbar-color:#b28c44 #ead9b0;
         }
 
-        #${ID} .p-list::-webkit-scrollbar { width:6px; }
+        #${ID} .p-list::-webkit-scrollbar {
+            width:6px;
+        }
 
         #${ID} .p-list::-webkit-scrollbar-track {
             background:#ead9b0;
@@ -431,14 +540,21 @@
         #${ID} .p-row {
             margin-bottom:10px;
             overflow:hidden;
+
             background:#fff7e1;
             border:1px solid #c5a66b;
             border-radius:8px;
-            box-shadow:0 2px 5px #865e1110,inset 0 1px 0 #fff6;
+
+            box-shadow:
+                0 2px 5px #865e1110,
+                inset 0 1px 0 #fff6;
+
             transition:border-color .15s,box-shadow .15s;
         }
 
-        #${ID} .p-row:last-child { margin-bottom:0; }
+        #${ID} .p-row:last-child {
+            margin-bottom:0;
+        }
 
         #${ID} .p-row:hover {
             border-color:#b28c44;
@@ -451,6 +567,7 @@
             gap:10px;
             min-height:55px;
             padding:7px 10px 7px 7px;
+
             background:linear-gradient(135deg,#f4ecd2 70%,#ead3a1 100%);
             box-shadow:inset 0 1px 0 #fff6;
         }
@@ -464,10 +581,12 @@
             min-width:0;
             align-self:stretch;
             padding:8px 9px;
+
             color:#5c4a23;
             background:transparent;
             border:0;
             border-radius:7px;
+
             font-size:13px;
             font-weight:600;
             line-height:1.5;
@@ -476,7 +595,9 @@
             cursor:pointer;
         }
 
-        #${ID} .p-expand[aria-expanded="true"] { color:#8b6b29; }
+        #${ID} .p-expand[aria-expanded="true"] {
+            color:#8b6b29;
+        }
 
         #${ID} .p-button {
             display:inline-flex;
@@ -484,16 +605,22 @@
             justify-content:center;
             min-height:34px;
             padding:7px 15px;
+
             color:#3a2e18;
             background:#ceae74;
             border:1.3px solid #8b6b29;
             border-radius:5px;
-            box-shadow:inset 0 1px 0 #fff4,0 1px 3px #865e1120;
+
+            box-shadow:
+                inset 0 1px 0 #fff4,
+                0 1px 3px #865e1120;
+
             font-size:12px;
             font-weight:700;
             line-height:1.4;
             text-shadow:none;
             cursor:pointer;
+
             transition:background .15s,box-shadow .15s,transform .15s;
         }
 
@@ -523,9 +650,11 @@
 
         #${ID} .p-details {
             padding:16px;
+
             color:#5c4a23;
             background:#fff7e1;
             border-top:1px solid #d5bb83;
+
             font-size:12px;
             line-height:1.7;
             overflow-wrap:anywhere;
@@ -535,10 +664,12 @@
             display:inline-block;
             margin:0 0 7px;
             padding:3px 8px;
+
             color:#5c4a23;
             background:#ffefc5;
             border:1px solid #d5bb83;
             border-radius:4px;
+
             font-size:9px;
             font-weight:700;
             line-height:1.5;
@@ -563,13 +694,17 @@
             position:relative;
             margin:0;
             padding:9px 3px 9px 15px;
+
             color:#5c4a23;
             border-bottom:1px solid #e8d8b2;
+
             font-size:12px;
             line-height:1.7;
         }
 
-        #${ID} .p-details li:last-child { border-bottom:0; }
+        #${ID} .p-details li:last-child {
+            border-bottom:0;
+        }
 
         #${ID} .p-details li::before {
             content:"";
@@ -586,6 +721,7 @@
             display:inline-block;
             margin-top:3px;
             padding:3px 0;
+
             color:#8b6b29;
             font-size:11px;
             font-weight:600;
@@ -601,11 +737,14 @@
         #${ID} .p-status {
             margin-top:16px;
             padding:11px 13px;
+
             color:#6e5c33;
             background:#ead9b070;
+
             border:1px solid #d5bb83;
             border-left:3px solid #b28c44;
             border-radius:6px;
+
             font-size:11px;
             line-height:1.7;
             white-space:pre-wrap;
@@ -636,8 +775,10 @@
         #${ID} .p-footer {
             margin-top:17px;
             padding-top:12px;
+
             color:#6e5c33;
             border-top:1px solid #d5bb83;
+
             font-size:10px;
             letter-spacing:.2px;
             text-align:right;
@@ -657,12 +798,29 @@
                 max-height:calc(100vh - 20px);
             }
 
-            #${ID} .p-head { padding:16px; }
-            #${ID} .p-head::after { left:16px; }
-            #${ID} .p-body { padding:15px 13px 12px; }
-            #${ID} .p-title { font-size:17px; }
-            #${ID} .p-list { max-height:43vh; }
-            #${ID} .p-details { padding:13px; }
+            #${ID} .p-head {
+                padding:16px;
+            }
+
+            #${ID} .p-head::after {
+                left:16px;
+            }
+
+            #${ID} .p-body {
+                padding:15px 13px 12px;
+            }
+
+            #${ID} .p-title {
+                font-size:17px;
+            }
+
+            #${ID} .p-list {
+                max-height:43vh;
+            }
+
+            #${ID} .p-details {
+                padding:13px;
+            }
         }
 
         @media (prefers-reduced-motion:reduce) {
@@ -681,27 +839,52 @@
     panel.innerHTML = `
         <div class="p-head" data-role="header">
             <span class="p-title" data-role="title"></span>
-            <button class="p-close" data-role="close"
-                type="button">×</button>
+
+            <button
+                class="p-close"
+                data-role="close"
+                type="button"
+            >×</button>
         </div>
 
         <div class="p-body">
             <div class="p-info" data-role="info"></div>
 
-            <input class="p-search" data-role="search"
-                type="search" autocomplete="off">
+            <input
+                class="p-search"
+                data-role="search"
+                type="search"
+                autocomplete="off"
+            >
+
+            <div
+                class="p-search-count"
+                data-role="search-count"
+                aria-live="polite"
+                aria-atomic="true"
+            ></div>
 
             <div class="p-list" data-role="list"></div>
 
-            <div class="p-status" data-role="status"
-                aria-live="polite"></div>
+            <div
+                class="p-status"
+                data-role="status"
+                aria-live="polite"
+            ></div>
 
             <div class="p-actions">
-                <button class="p-button" data-role="refresh"
-                    type="button"></button>
+                <button
+                    class="p-button"
+                    data-role="refresh"
+                    type="button"
+                ></button>
 
-                <span class="p-count" data-role="count"
-                    aria-live="polite"></span>
+                <span
+                    class="p-count"
+                    data-role="submitted-count"
+                    aria-live="polite"
+                    aria-atomic="true"
+                ></span>
             </div>
 
             <div class="p-footer" data-role="footer"></div>
@@ -903,7 +1086,9 @@
             "g"
         );
 
-        for (const script of page.querySelectorAll("script:not([src])")) {
+        for (const script of page.querySelectorAll(
+            "script:not([src])"
+        )) {
             const source = script.textContent || "";
             pattern.lastIndex = 0;
 
@@ -927,7 +1112,11 @@
                 let inString = false;
                 let escaped = false;
 
-                for (let index = start; index < source.length; index++) {
+                for (
+                    let index = start;
+                    index < source.length;
+                    index++
+                ) {
                     const character = source[index];
 
                     if (inString) {
@@ -953,7 +1142,8 @@
                     }
 
                     if (character === "}" || character === "]") {
-                        const expected = character === "}" ? "{" : "[";
+                        const expected =
+                            character === "}" ? "{" : "[";
 
                         if (stack.pop() !== expected) {
                             throw new Error(
@@ -988,15 +1178,18 @@
         if (value === null) return "null";
 
         if (Array.isArray(value)) {
-            return "[" +
+            return (
+                "[" +
                 value.map(readableFilterValue).join(", ") +
-                "]";
+                "]"
+            );
         }
 
         if (typeof value === "object") {
             return Object.entries(value)
                 .map(([key, item]) =>
-                    `${key.replace(/_/g, " ")}: ${readableFilterValue(item)}`
+                    `${key.replace(/_/g, " ")}: ` +
+                    readableFilterValue(item)
                 )
                 .join("; ");
         }
@@ -1077,11 +1270,11 @@
                 const groupName = option.textContent.trim();
                 const status = statusSelect.value;
 
-                let description;
-
                 if (status !== "0" && status !== "1") {
                     return null;
                 }
+
+                let description;
 
                 if (groupId === "0") {
                     description = status === "1"
@@ -1089,8 +1282,11 @@
                         : t("hasManualMembership");
                 } else {
                     description =
-                        `${t(status === "1" ? "memberOf" : "notMemberOf")}: ` +
-                        groupName;
+                        `${t(
+                            status === "1"
+                                ? "memberOf"
+                                : "notMemberOf"
+                        )}: ${groupName}`;
                 }
 
                 return {
@@ -1121,7 +1317,10 @@
             );
         }
 
-        if (type === "army_type" && hasFields(entry, ["value"])) {
+        if (
+            type === "army_type" &&
+            hasFields(entry, ["value"])
+        ) {
             return armyTypes[entry.value] || String(entry.value);
         }
 
@@ -1145,7 +1344,9 @@
         ) {
             const hasIncoming = String(entry.has_incoming);
 
-            if (hasIncoming === "0") return t("none");
+            if (hasIncoming === "0") {
+                return t("none");
+            }
 
             if (hasIncoming === "1") {
                 return (
@@ -1158,7 +1359,12 @@
 
         if (
             type === "unit" &&
-            hasFields(entry, ["unit", "unit_status", "operator", "count"])
+            hasFields(entry, [
+                "unit",
+                "unit_status",
+                "operator",
+                "count"
+            ])
         ) {
             const unitName =
                 unitNames[entry.unit] || String(entry.unit);
@@ -1268,8 +1474,11 @@
                     finished = true;
                     clearInterval(timer);
 
-                    if (error) reject(error);
-                    else resolve(definition);
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(definition);
+                    }
                 }
 
                 frame.addEventListener("load", () => {
@@ -1307,7 +1516,8 @@
                             return;
                         }
 
-                        const form = page.querySelector("#filter_config");
+                        const form =
+                            page.querySelector("#filter_config");
 
                         if (!form) {
                             lastProblem = t("frameNoForm");
@@ -1354,7 +1564,8 @@
                         const hasConditions = Object.values(
                             activeFilters
                         ).some(entries =>
-                            Array.isArray(entries) && entries.length > 0
+                            Array.isArray(entries) &&
+                            entries.length > 0
                         );
 
                         const hasControls = Boolean(
@@ -1394,6 +1605,7 @@
         link.target = "_blank";
         link.rel = "noopener";
         link.textContent = t("openDefinition");
+
         container.appendChild(link);
     }
 
@@ -1434,6 +1646,7 @@
         if (busy) return;
 
         details.hidden = !details.hidden;
+
         button.textContent =
             `${details.hidden ? "▶" : "▼"} ${group.name}`;
 
@@ -1451,25 +1664,31 @@
 
         setBusy(true);
         details.textContent = t("loadingDefinition");
-        setStatus(t("loadingGroup", { name: group.name }));
+
+        setStatus(t("loadingGroup", {
+            name: group.name
+        }));
 
         try {
-            const definition = await loadInitializedDefinition(group);
+            const definition =
+                await loadInitializedDefinition(group);
 
             cache.set(group.id, definition);
             showDefinition(details, definition, group);
 
-            setStatus(t("filtersLoaded", { name: group.name }));
+            setStatus(t("filtersLoaded", {
+                name: group.name
+            }));
         } catch (error) {
             details.replaceChildren();
 
             const message = document.createElement("div");
             message.textContent = error.message;
+
             details.appendChild(message);
-
             appendDefinitionLink(details, group);
-            setStatus(t("definitionFailed"), true);
 
+            setStatus(t("definitionFailed"), true);
             console.error("[Patika30 filters]", error);
         } finally {
             setBusy(false);
@@ -1485,27 +1704,37 @@
 
         list.querySelectorAll(".p-row").forEach(row => {
             const matches = row.dataset.search.includes(query);
+
             row.hidden = !matches;
 
-            if (matches) visible++;
+            if (matches) {
+                visible++;
+            }
         });
 
-        get("count").textContent = t(
+        get("search-count").textContent = t(
             query ? "searchCount" : "count",
             {
                 visible,
-                total: groups.length,
-                submitted
+                total: groups.length
             }
         );
 
-        const showMessage = groups.length === 0 || visible === 0;
+        get("submitted-count").textContent = t(
+            "submittedCount",
+            { submitted }
+        );
+
+        const showMessage =
+            groups.length === 0 || visible === 0;
 
         listMessage.hidden = !showMessage;
 
         if (showMessage) {
             listMessage.textContent = t(
-                groups.length === 0 ? "empty" : "noResults"
+                groups.length === 0
+                    ? "empty"
+                    : "noResults"
             );
         }
     }
@@ -1514,7 +1743,10 @@
         if (busy || !mapForm) return;
 
         setBusy(true);
-        setStatus(t("submitting", { name: group.name }));
+
+        setStatus(t("submitting", {
+            name: group.name
+        }));
 
         try {
             const action = new URL(
@@ -1554,14 +1786,20 @@
                 mapForm = updatedForm.cloneNode(true);
             }
 
-            groups = groups.filter(item => item.id !== group.id);
+            groups = groups.filter(item =>
+                item.id !== group.id
+            );
+
             submitted++;
 
             row.remove();
             cache.delete(group.id);
+
             updateListState();
 
-            setStatus(t("submitted", { name: group.name }));
+            setStatus(t("submitted", {
+                name: group.name
+            }));
         } catch (error) {
             setStatus(t("retryWarning", {
                 message: error.message
@@ -1612,6 +1850,7 @@
 
             rowHeader.append(expand, add);
             row.append(rowHeader, details);
+
             list.appendChild(row);
         }
 
@@ -1626,6 +1865,7 @@
 
         setStatus(t("reloading"));
         get("refresh").disabled = true;
+
         location.reload();
     });
 
@@ -1672,14 +1912,27 @@
     header.addEventListener("pointermove", event => {
         if (!drag || drag.id !== event.pointerId) return;
 
-        const maxX = Math.max(0, innerWidth - panel.offsetWidth);
-        const maxY = Math.max(0, innerHeight - panel.offsetHeight);
+        const maxX = Math.max(
+            0,
+            innerWidth - panel.offsetWidth
+        );
+
+        const maxY = Math.max(
+            0,
+            innerHeight - panel.offsetHeight
+        );
 
         panel.style.left =
-            Math.max(0, Math.min(maxX, event.clientX - drag.x)) + "px";
+            Math.max(
+                0,
+                Math.min(maxX, event.clientX - drag.x)
+            ) + "px";
 
         panel.style.top =
-            Math.max(0, Math.min(maxY, event.clientY - drag.y)) + "px";
+            Math.max(
+                0,
+                Math.min(maxY, event.clientY - drag.y)
+            ) + "px";
     });
 
     for (const eventName of [
