@@ -1,0 +1,1770 @@
+// Készítette: Patika30
+// Térképes csoportsegéd az eredeti krémes–aranybarna színvilággal.
+// A szűrőleírásokat ideiglenes iframe-ben inicializált oldalról olvassa.
+// Térképes kiemelést kizárólag az Add gombra kattintás küld be.
+// A script használatának szerveroldali engedélyezése nem vélelmezett.
+
+(async function () {
+    "use strict";
+
+    const KEY = "__PATIKA30_EXPANDABLE_GROUPS__";
+    const ID = "patika30-expandable-groups";
+    const FRAME_TIMEOUT = 20000;
+
+    if (window[KEY]) {
+        alert("Close the existing Map village groups popup first.");
+        return;
+    }
+
+    if (new URL(location.href).searchParams.get("screen") !== "map") {
+        alert("Open the map before running this script.");
+        return;
+    }
+
+    window[KEY] = true;
+
+    let busy = false;
+    let groups = [];
+    let mapForm = null;
+    let submitted = 0;
+
+    const cache = new Map();
+    const mapUrl = new URL(location.href);
+
+    for (const key of ["action", "h", "ajax", "ajaxaction"]) {
+        mapUrl.searchParams.delete(key);
+    }
+
+    const style = document.createElement("style");
+
+    style.textContent = `
+        #${ID} {
+            --p-ink:#403c33;
+            --p-muted:#6e5c33;
+            --p-accent:#8b6b29;
+            --p-border:#b28c44;
+            --p-surface:#f4ecd2;
+
+            position:fixed;
+            left:50%;
+            top:50%;
+            transform:translate(-50%,-50%);
+            z-index:2147483647;
+
+            width:510px;
+            max-width:calc(100vw - 28px);
+            max-height:calc(100vh - 28px);
+
+            display:flex;
+            flex-direction:column;
+            overflow:hidden;
+
+            color:var(--p-ink);
+
+            background:linear-gradient(
+                135deg,
+                #f4ecd2 70%,
+                #dbb875 100%
+            );
+
+            border:2.6px solid #b28c44;
+            border-radius:11px;
+
+            box-shadow:
+                0 9px 32px #865e11b0,
+                inset 0 1.5px 0 #7f5315;
+
+            font:13px -apple-system,BlinkMacSystemFont,
+                "Segoe UI",Verdana,Arial,sans-serif;
+            line-height:1.5;
+            isolation:isolate;
+
+            animation:p30-panel-enter .2s ease-out;
+        }
+
+        @keyframes p30-panel-enter {
+            from { opacity:0; }
+            to { opacity:1; }
+        }
+
+        #${ID},
+        #${ID} * {
+            box-sizing:border-box;
+        }
+
+        #${ID} [hidden] {
+            display:none !important;
+        }
+
+        #${ID} button,
+        #${ID} input {
+            font-family:inherit;
+        }
+
+        #${ID} button {
+            -webkit-tap-highlight-color:transparent;
+        }
+
+        #${ID} button:focus-visible,
+        #${ID} input:focus-visible,
+        #${ID} a:focus-visible {
+            outline:3px solid #b28c44;
+            outline-offset:3px;
+        }
+
+        #${ID} .p-head {
+            position:relative;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            flex-shrink:0;
+            gap:16px;
+
+            margin:0;
+            padding:20px 22px;
+
+            background:linear-gradient(
+                135deg,
+                #f4ecd2 70%,
+                #e5c990 100%
+            );
+
+            border:0;
+            border-bottom:1px solid #d5bb83;
+            box-shadow:inset 0 1px 0 #fff6;
+
+            cursor:move;
+            user-select:none;
+            touch-action:none;
+        }
+
+        #${ID} .p-head::after {
+            content:"";
+            position:absolute;
+            left:22px;
+            bottom:-1px;
+            width:48px;
+            height:3px;
+            border-radius:3px;
+            background:#b28c44;
+        }
+
+        #${ID} .p-title {
+            display:flex;
+            align-items:center;
+            gap:11px;
+
+            color:#403c33;
+            font-size:19px;
+            font-weight:700;
+            line-height:1.3;
+            letter-spacing:-.45px;
+            text-shadow:1px 1px 0 #fff6;
+        }
+
+        #${ID} .p-title::before {
+            content:"";
+            display:block;
+            flex-shrink:0;
+            width:12px;
+            height:12px;
+
+            background:#b28c44;
+            border:3px solid #f4ecd2;
+            border-radius:4px;
+            box-shadow:0 0 0 1px #b28c44;
+        }
+
+        #${ID} .p-close {
+            display:grid;
+            place-items:center;
+            flex-shrink:0;
+            width:32px;
+            height:32px;
+            padding:0;
+
+            color:#5c4a23;
+            background:#ead7ad;
+            border:1px solid #b28c44;
+            border-radius:6px;
+
+            font:400 24px Arial,sans-serif;
+            line-height:1;
+            cursor:pointer;
+
+            transition:
+                color .15s ease,
+                background .15s ease,
+                border-color .15s ease;
+        }
+
+        #${ID} .p-close:hover {
+            color:#7f3525;
+            background:#e3c58e;
+            border-color:#8b6b29;
+        }
+
+        #${ID} .p-body {
+            min-height:0;
+            padding:19px 20px 15px;
+            overflow:auto;
+        }
+
+        #${ID} .p-info {
+            padding:0 2px;
+            color:#6e5c33;
+            font-size:12px;
+            line-height:1.7;
+        }
+
+        #${ID} .p-search {
+            display:block;
+            width:100%;
+            height:43px;
+            margin:15px 0 16px;
+            padding:10px 14px;
+
+            color:#403c33;
+            background:#fff7e1;
+            border:1.8px solid #b28c44;
+            border-radius:6px;
+            box-shadow:inset 0 1px 3px #865e1110;
+
+            font-size:13px;
+
+            transition:
+                border-color .15s ease,
+                box-shadow .15s ease;
+        }
+
+        #${ID} .p-search::placeholder {
+            color:#9a8559;
+        }
+
+        #${ID} .p-search:focus {
+            outline:none;
+            border-color:#8b6b29;
+
+            box-shadow:
+                inset 0 1px 3px #865e1110,
+                0 0 0 3px #b28c4426;
+        }
+
+        #${ID} .p-list {
+            max-height:47vh;
+            overflow:auto;
+            overscroll-behavior:contain;
+            padding:2px 6px 3px 1px;
+
+            scrollbar-width:thin;
+            scrollbar-color:#b28c44 #ead9b0;
+        }
+
+        #${ID} .p-list::-webkit-scrollbar {
+            width:6px;
+        }
+
+        #${ID} .p-list::-webkit-scrollbar-track {
+            background:#ead9b0;
+            border-radius:10px;
+        }
+
+        #${ID} .p-list::-webkit-scrollbar-thumb {
+            background:#b28c44;
+            border:1px solid #ead9b0;
+            border-radius:10px;
+        }
+
+        #${ID} .p-row {
+            margin-bottom:10px;
+            overflow:hidden;
+
+            background:#fff7e1;
+            border:1px solid #c5a66b;
+            border-radius:8px;
+
+            box-shadow:
+                0 2px 5px #865e1110,
+                inset 0 1px 0 #fff6;
+
+            transition:
+                border-color .15s ease,
+                box-shadow .15s ease;
+        }
+
+        #${ID} .p-row:last-child {
+            margin-bottom:0;
+        }
+
+        #${ID} .p-row:hover {
+            border-color:#b28c44;
+            box-shadow:0 3px 9px #865e1124;
+        }
+
+        #${ID} .p-row-head {
+            display:flex;
+            align-items:center;
+            gap:10px;
+            min-height:55px;
+            padding:7px 10px 7px 7px;
+
+            background:linear-gradient(
+                135deg,
+                #f4ecd2 70%,
+                #ead3a1 100%
+            );
+
+            box-shadow:inset 0 1px 0 #fff6;
+            transition:background .15s ease;
+        }
+
+        #${ID} .p-row-head:hover {
+            background:linear-gradient(
+                135deg,
+                #f8efd5 70%,
+                #edd9af 100%
+            );
+        }
+
+        #${ID} .p-expand {
+            flex:1;
+            min-width:0;
+            align-self:stretch;
+            padding:8px 9px;
+
+            color:#5c4a23;
+            background:transparent;
+            border:0;
+            border-radius:7px;
+
+            font-size:13px;
+            font-weight:600;
+            line-height:1.5;
+            text-align:left;
+            overflow-wrap:anywhere;
+            cursor:pointer;
+        }
+
+        #${ID} .p-expand[aria-expanded="true"] {
+            color:#8b6b29;
+        }
+
+        #${ID} .p-button {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            min-height:34px;
+            padding:7px 15px;
+
+            color:#3a2e18;
+            background:#ceae74;
+            border:1.3px solid #8b6b29;
+            border-radius:5px;
+
+            box-shadow:
+                inset 0 1px 0 #fff4,
+                0 1px 3px #865e1120;
+
+            font-size:12px;
+            font-weight:700;
+            line-height:1.4;
+            text-shadow:none;
+            cursor:pointer;
+
+            transition:
+                background .15s ease,
+                box-shadow .15s ease,
+                transform .15s ease;
+        }
+
+        #${ID} .p-add {
+            min-width:61px;
+            flex-shrink:0;
+        }
+
+        #${ID} .p-button:hover:not(:disabled) {
+            color:#3a2e18;
+            background:#d9ba82;
+            border-color:#7f5e22;
+            box-shadow:0 3px 7px #865e112b;
+        }
+
+        #${ID} .p-button:active:not(:disabled) {
+            background:#c2a065;
+            transform:translateY(1px);
+            box-shadow:inset 0 1px 3px #865e1130;
+        }
+
+        #${ID} button:disabled {
+            opacity:.5;
+            cursor:wait;
+            transform:none;
+            box-shadow:none;
+        }
+
+        #${ID} .p-details {
+            padding:16px;
+
+            color:#5c4a23;
+            background:#fff7e1;
+            border-top:1px solid #d5bb83;
+
+            font-size:12px;
+            line-height:1.7;
+            overflow-wrap:anywhere;
+        }
+
+        #${ID} .p-details > strong {
+            display:inline-block;
+            margin:0 0 7px;
+            padding:3px 8px;
+
+            color:#5c4a23;
+            background:#ffefc5;
+            border:1px solid #d5bb83;
+            border-radius:4px;
+
+            font-size:9px;
+            font-weight:700;
+            line-height:1.5;
+            letter-spacing:.9px;
+            text-transform:uppercase;
+        }
+
+        #${ID} .p-logic {
+            margin-top:2px;
+            color:#8d7950;
+            font-size:11px;
+            line-height:1.65;
+        }
+
+        #${ID} .p-details ul {
+            margin:12px 0;
+            padding:0;
+            list-style:none;
+        }
+
+        #${ID} .p-details li {
+            position:relative;
+            margin:0;
+            padding:9px 3px 9px 15px;
+
+            color:#5c4a23;
+            border-bottom:1px solid #e8d8b2;
+
+            font-size:12px;
+            line-height:1.7;
+        }
+
+        #${ID} .p-details li:last-child {
+            border-bottom:0;
+        }
+
+        #${ID} .p-details li::before {
+            content:"";
+            position:absolute;
+            left:1px;
+            top:17px;
+            width:5px;
+            height:5px;
+            background:#b28c44;
+            border-radius:50%;
+        }
+
+        #${ID} .p-details a {
+            display:inline-block;
+            margin-top:3px;
+            padding:3px 0;
+
+            color:#8b6b29;
+            font-size:11px;
+            font-weight:600;
+            text-decoration:none;
+        }
+
+        #${ID} .p-details a:hover {
+            color:#5c4a23;
+            text-decoration:underline;
+            text-underline-offset:3px;
+        }
+
+        #${ID} .p-status {
+            margin-top:16px;
+            padding:11px 13px;
+
+            color:#6e5c33;
+            background:#ead9b070;
+
+            border:1px solid #d5bb83;
+            border-left:3px solid #b28c44;
+            border-radius:6px;
+
+            font-size:11px;
+            line-height:1.7;
+            white-space:pre-wrap;
+        }
+
+        #${ID} .p-status.p-error {
+            color:#8c4130;
+            background:#f0d9bd;
+            border-color:#c99e76;
+            border-left-color:#a96342;
+        }
+
+        #${ID} .p-actions {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            flex-wrap:wrap;
+            gap:12px;
+            margin-top:14px;
+        }
+
+        #${ID} .p-count {
+            color:#806c42;
+            font-size:11px;
+            font-variant-numeric:tabular-nums;
+        }
+
+        #${ID} .p-footer {
+            margin-top:17px;
+            padding-top:12px;
+
+            color:#6e5c33;
+            border-top:1px solid #d5bb83;
+
+            font-size:10px;
+            letter-spacing:.2px;
+            text-align:right;
+            text-shadow:none;
+        }
+
+        #${ID} .p-empty {
+            padding:30px 15px;
+            color:#6e5c33;
+            font-size:12px;
+            text-align:center;
+        }
+
+        @media (max-width:540px) {
+            #${ID} {
+                width:calc(100vw - 20px);
+                max-width:calc(100vw - 20px);
+                max-height:calc(100vh - 20px);
+            }
+
+            #${ID} .p-head {
+                padding:16px;
+            }
+
+            #${ID} .p-head::after {
+                left:16px;
+            }
+
+            #${ID} .p-body {
+                padding:15px 13px 12px;
+            }
+
+            #${ID} .p-title {
+                font-size:17px;
+            }
+
+            #${ID} .p-list {
+                max-height:43vh;
+            }
+
+            #${ID} .p-details {
+                padding:13px;
+            }
+        }
+
+        @media (prefers-reduced-motion:reduce) {
+            #${ID},
+            #${ID} * {
+                animation:none !important;
+                transition:none !important;
+            }
+        }
+    `;
+
+    document.head.appendChild(style);
+
+    const panel = document.createElement("div");
+    panel.id = ID;
+
+    panel.innerHTML = `
+        <div class="p-head" data-role="header">
+            <span class="p-title">Map village groups</span>
+
+            <button
+                class="p-close"
+                data-role="close"
+                type="button"
+                aria-label="Close"
+            >×</button>
+        </div>
+
+        <div class="p-body">
+            <div class="p-info">
+                Click a name to load its initialized filter page.
+                Click Add to submit one map highlight.
+            </div>
+
+            <input
+                class="p-search"
+                data-role="search"
+                type="search"
+                placeholder="Search groups..."
+                autocomplete="off"
+                aria-label="Search groups"
+            >
+
+            <div class="p-list" data-role="list"></div>
+
+            <div
+                class="p-status"
+                data-role="status"
+                aria-live="polite"
+            ></div>
+
+            <div class="p-actions">
+                <button
+                    class="p-button"
+                    data-role="refresh"
+                    type="button"
+                >Refresh map</button>
+
+                <span class="p-count" data-role="count"></span>
+            </div>
+
+            <div class="p-footer">Made by: Patika30</div>
+        </div>
+    `;
+
+    document.body.appendChild(panel);
+
+    const get = role =>
+        panel.querySelector(`[data-role="${role}"]`);
+
+    const list = get("list");
+    const search = get("search");
+
+    const operators = {
+        ">": ">",
+        "<": "<",
+        "=": "=",
+        ">=": "≥",
+        "<=": "≤",
+        "!=": "≠"
+    };
+
+    const buildingNames = {
+        main: "Headquarters",
+        barracks: "Barracks",
+        stable: "Stable",
+        garage: "Workshop",
+        church: "Church",
+        church_f: "First church",
+        watchtower: "Watchtower",
+        snob: "Academy",
+        smith: "Smithy",
+        place: "Rally point",
+        statue: "Statue",
+        market: "Market",
+        wood: "Timber camp",
+        stone: "Clay pit",
+        iron: "Iron mine",
+        farm: "Farm",
+        storage: "Warehouse",
+        hide: "Hiding place",
+        wall: "Wall"
+    };
+
+    const unitNames = {
+        spear: "Spear fighter",
+        sword: "Swordsman",
+        axe: "Axeman",
+        archer: "Archer",
+        spy: "Scout",
+        light: "Light cavalry",
+        marcher: "Mounted archer",
+        heavy: "Heavy cavalry",
+        ram: "Ram",
+        catapult: "Catapult",
+        knight: "Paladin",
+        snob: "Nobleman",
+        militia: "Militia"
+    };
+
+    const unitStatuses = {
+        home: "at home",
+        own: "belonging to the village",
+        supporting: "away as support",
+        here: "in the village",
+        support: "supporting the village",
+        travel: "in transit",
+        returning: "returning",
+        outgoing: "outgoing",
+        out: "away from home"
+    };
+
+    const labels = {
+        army_type: "Army type",
+        am: "Account manager",
+        incoming_attack: "Incoming attack",
+        incoming_support: "Incoming support",
+        outgoing_attack: "Outgoing attack",
+        noblemen: "Contains noblemen",
+        belief: "Church influence",
+        points: "Points",
+        loyalty: "Loyalty",
+        pop_total: "Population",
+        building: "Contains building",
+        carrying_capacity: "Carrying capacity",
+        unit: "Units",
+        supporting_unit: "Supporting units",
+        scavenging: "Scavenging",
+        tech: "Technology",
+        resource: "Resources",
+        trader: "Merchants",
+        modification: "Modification",
+        coordinate: "Coordinate",
+        distance: "Distance",
+        continent: "Continent",
+        notes: "Own notes",
+        bonus: "Bonus village",
+        flag: "Flag",
+        relic: "Relic equipped",
+        group_static: "Manual group membership"
+    };
+
+    const armyTypes = {
+        offense: "Offense",
+        defense: "Defense"
+    };
+
+    const populationTypes = {
+        buildings: "Buildings",
+        troops: "Troops",
+        used: "Total used",
+        available: "Available"
+    };
+
+    function setStatus(message, error = false) {
+        get("status").textContent = message;
+        get("status").classList.toggle("p-error", error);
+    }
+
+    function setBusy(value) {
+        busy = value;
+
+        panel.querySelectorAll(
+            ".p-expand,.p-add,[data-role='refresh']"
+        ).forEach(button => {
+            button.disabled = value;
+        });
+    }
+
+    function findMapForm(root) {
+        return root.querySelector(
+            'form[action*="action=add_own_group"]'
+        );
+    }
+
+    function filterUrl(group) {
+        const url = new URL(mapUrl.href);
+
+        url.searchParams.set("screen", "overview_villages");
+        url.searchParams.set("mode", "groups");
+        url.searchParams.set("type", "dynamic");
+        url.searchParams.set("group", group.id);
+
+        return url;
+    }
+
+    async function readPage(response) {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        if (new URL(response.url).origin !== location.origin) {
+            throw new Error("Unexpected redirect.");
+        }
+
+        const page = new DOMParser().parseFromString(
+            await response.text(),
+            "text/html"
+        );
+
+        if (page.querySelector(
+            'input[type="password"],#bot_check,#botprotection_quest'
+        )) {
+            throw new Error(
+                "Login or verification required. Check the game page."
+            );
+        }
+
+        return page;
+    }
+
+    function readVillageFiltersJSON(page, property, required = false) {
+        const escapedProperty = property.replace(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&"
+        );
+
+        const pattern = new RegExp(
+            "\\bVillageFilters\\s*\\.\\s*" +
+            escapedProperty +
+            "\\s*=\\s*",
+            "g"
+        );
+
+        for (const script of page.querySelectorAll(
+            "script:not([src])"
+        )) {
+            const source = script.textContent || "";
+            pattern.lastIndex = 0;
+
+            let match;
+
+            while ((match = pattern.exec(source))) {
+                let start = pattern.lastIndex;
+
+                while (
+                    start < source.length &&
+                    /\s/.test(source[start])
+                ) {
+                    start++;
+                }
+
+                if (source[start] !== "{" && source[start] !== "[") {
+                    continue;
+                }
+
+                const stack = [];
+                let inString = false;
+                let escaped = false;
+
+                for (
+                    let index = start;
+                    index < source.length;
+                    index++
+                ) {
+                    const character = source[index];
+
+                    if (inString) {
+                        if (escaped) {
+                            escaped = false;
+                        } else if (character === "\\") {
+                            escaped = true;
+                        } else if (character === '"') {
+                            inString = false;
+                        }
+
+                        continue;
+                    }
+
+                    if (character === '"') {
+                        inString = true;
+                        continue;
+                    }
+
+                    if (character === "{" || character === "[") {
+                        stack.push(character);
+                        continue;
+                    }
+
+                    if (character === "}" || character === "]") {
+                        const expected =
+                            character === "}" ? "{" : "[";
+
+                        if (stack.pop() !== expected) {
+                            throw new Error(
+                                `Malformed JSON data for ${property}.`
+                            );
+                        }
+
+                        if (!stack.length) {
+                            try {
+                                return JSON.parse(
+                                    source.slice(start, index + 1)
+                                );
+                            } catch {
+                                throw new Error(
+                                    `${property} is not valid JSON.`
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (required) {
+            throw new Error(
+                `Saved filter data "${property}" was not found.`
+            );
+        }
+
+        return null;
+    }
+
+    function readableFilterValue(value) {
+        if (value === null) return "null";
+
+        if (Array.isArray(value)) {
+            return (
+                "[" +
+                value.map(readableFilterValue).join(", ") +
+                "]"
+            );
+        }
+
+        if (typeof value === "object") {
+            return Object.entries(value)
+                .map(([key, item]) =>
+                    `${key.replace(/_/g, " ")}: ` +
+                    readableFilterValue(item)
+                )
+                .join("; ");
+        }
+
+        return String(value);
+    }
+
+    function formatAmount(value) {
+        const raw = String(value);
+        const number = Number(raw);
+
+        return raw.trim() !== "" && Number.isFinite(number)
+            ? number.toLocaleString("en-US")
+            : raw;
+    }
+
+    function hasFields(value, fields) {
+        return (
+            value !== null &&
+            typeof value === "object" &&
+            !Array.isArray(value) &&
+            fields.every(field =>
+                Object.prototype.hasOwnProperty.call(value, field)
+            )
+        );
+    }
+
+    function formatOperator(value) {
+        return operators[value] || String(value);
+    }
+
+    function readManualGroupFilters(root = document) {
+        const form = root.matches?.("#filter_config")
+            ? root
+            : root.querySelector("#filter_config");
+
+        if (!form) return [];
+
+        return Array.from(
+            form.querySelectorAll(
+                'input[type="checkbox"][data-filter="group_static"]'
+            )
+        )
+            .filter(checkbox =>
+                checkbox.checked && !checkbox.disabled
+            )
+            .map(checkbox => {
+                const index = checkbox.dataset.id;
+                const row = checkbox.closest("tr");
+
+                if (!row) return null;
+
+                const statusSelect = row.querySelector(
+                    `select[name="group_static_status_${index}"]`
+                );
+
+                const groupSelect = row.querySelector(
+                    `select[name="group_static_${index}"]`
+                );
+
+                if (
+                    !statusSelect ||
+                    !groupSelect ||
+                    statusSelect.disabled ||
+                    groupSelect.disabled
+                ) {
+                    return null;
+                }
+
+                const groupOption =
+                    groupSelect.options[groupSelect.selectedIndex];
+
+                const statusOption =
+                    statusSelect.options[statusSelect.selectedIndex];
+
+                if (!groupOption || !statusOption) return null;
+
+                const relationship =
+                    statusOption.textContent.trim() ||
+                    (statusSelect.value === "1"
+                        ? "Member of"
+                        : "Not a member of");
+
+                const groupName = groupOption.textContent.trim();
+
+                return {
+                    filterIndex: index,
+                    status: statusSelect.value,
+                    groupId: groupSelect.value,
+                    groupName,
+                    description: `${relationship}: ${groupName}`
+                };
+            })
+            .filter(Boolean);
+    }
+
+    function formatRule(type, entry, buildings) {
+        if (
+            type === "building" &&
+            hasFields(entry, ["building", "operator", "level"]) &&
+            typeof entry.building === "string"
+        ) {
+            const building =
+                buildings[entry.building]?.name ||
+                buildingNames[entry.building] ||
+                entry.building;
+
+            return (
+                `${building} ${formatOperator(entry.operator)} ` +
+                `level ${entry.level}`
+            );
+        }
+
+        if (
+            type === "army_type" &&
+            hasFields(entry, ["value"])
+        ) {
+            return armyTypes[entry.value] || String(entry.value);
+        }
+
+        if (
+            type === "pop_total" &&
+            hasFields(entry, ["pop_status", "operator", "pop"])
+        ) {
+            const populationType =
+                populationTypes[entry.pop_status] ||
+                String(entry.pop_status);
+
+            return (
+                `${populationType} ${formatOperator(entry.operator)} ` +
+                formatAmount(entry.pop)
+            );
+        }
+
+        if (
+            type === "incoming_attack" &&
+            hasFields(entry, ["has_incoming", "operator", "attacks"])
+        ) {
+            const hasIncoming = String(entry.has_incoming);
+
+            if (hasIncoming === "0") return "None";
+
+            if (hasIncoming === "1") {
+                return (
+                    `Count ${formatOperator(entry.operator)} ` +
+                    formatAmount(entry.attacks)
+                );
+            }
+        }
+
+        if (
+            type === "unit" &&
+            hasFields(entry, [
+                "unit",
+                "unit_status",
+                "operator",
+                "count"
+            ])
+        ) {
+            const unitName =
+                unitNames[entry.unit] || String(entry.unit);
+
+            const unitStatus =
+                unitStatuses[entry.unit_status] ||
+                String(entry.unit_status);
+
+            return (
+                `${unitName} ${unitStatus} ` +
+                `${formatOperator(entry.operator)} ` +
+                formatAmount(entry.count)
+            );
+        }
+
+        return readableFilterValue(entry);
+    }
+
+    function parseDefinition(page, group, activeFilters) {
+        const form = page.querySelector("#filter_config");
+
+        if (!form) {
+            throw new Error(
+                "No dynamic filter definition was returned."
+            );
+        }
+
+        const returnedId = form.querySelector(
+            'input[name="group_id"]'
+        )?.value;
+
+        if (returnedId !== String(group.id)) {
+            throw new Error(
+                "The server returned a different group's definition."
+            );
+        }
+
+        if (
+            !activeFilters ||
+            typeof activeFilters !== "object" ||
+            Array.isArray(activeFilters)
+        ) {
+            throw new Error("Unexpected saved-filter data format.");
+        }
+
+        const buildings =
+            readVillageFiltersJSON(page, "buildings") || {};
+
+        const rules = [];
+
+        for (const [type, entries] of Object.entries(activeFilters)) {
+            if (type === "group_static") continue;
+
+            if (!Array.isArray(entries)) {
+                throw new Error(
+                    `Unsupported saved-filter format for "${type}".`
+                );
+            }
+
+            for (const entry of entries) {
+                rules.push({
+                    label: labels[type] || type.replace(/_/g, " "),
+                    value: formatRule(type, entry, buildings)
+                });
+            }
+        }
+
+        const manualRules = readManualGroupFilters(form);
+
+        for (const rule of manualRules) {
+            rules.push({
+                label: labels.group_static,
+                value: rule.description
+            });
+        }
+
+        const custom = form.querySelector(
+            '[name="use_custom_logic"]'
+        )?.value === "1";
+
+        return { rules, custom };
+    }
+
+    async function loadInitializedDefinition(group) {
+        const frame = document.createElement("iframe");
+
+        frame.title = "Temporary group filter reader";
+        frame.setAttribute("aria-hidden", "true");
+        frame.tabIndex = -1;
+
+        Object.assign(frame.style, {
+            position: "fixed",
+            left: "-10000px",
+            top: "0",
+            width: "1000px",
+            height: "700px",
+            border: "0",
+            pointerEvents: "none",
+            opacity: "0"
+        });
+
+        let timer = null;
+
+        try {
+            return await new Promise((resolve, reject) => {
+                let finished = false;
+                let loaded = false;
+                let lastProblem =
+                    "The filter page did not finish initializing.";
+
+                const deadline = Date.now() + FRAME_TIMEOUT;
+
+                function finish(error, definition) {
+                    if (finished) return;
+
+                    finished = true;
+                    clearInterval(timer);
+
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(definition);
+                    }
+                }
+
+                frame.addEventListener("load", () => {
+                    loaded = true;
+                });
+
+                frame.addEventListener("error", () => {
+                    finish(new Error(
+                        "The filter page could not be loaded in a frame. " +
+                        "Open the original filter definition instead."
+                    ));
+                });
+
+                timer = setInterval(() => {
+                    if (finished) return;
+
+                    if (Date.now() >= deadline) {
+                        finish(new Error(
+                            lastProblem +
+                            " The game may block embedded pages. " +
+                            "Open the original filter definition to check."
+                        ));
+                        return;
+                    }
+
+                    if (!loaded) return;
+
+                    try {
+                        const page = frame.contentDocument;
+
+                        if (!page) {
+                            lastProblem =
+                                "The embedded document is unavailable.";
+                            return;
+                        }
+
+                        if (page.URL === "about:blank") return;
+
+                        if (page.querySelector(
+                            'input[type="password"],' +
+                            '#bot_check,#botprotection_quest'
+                        )) {
+                            finish(new Error(
+                                "Login or verification required. " +
+                                "Open the original game page."
+                            ));
+                            return;
+                        }
+
+                        const form =
+                            page.querySelector("#filter_config");
+
+                        if (!form) {
+                            lastProblem =
+                                "No dynamic filter form was found. " +
+                                "This may be a manual group or an " +
+                                "unsupported page.";
+                            return;
+                        }
+
+                        const returnedId = form.querySelector(
+                            '[name="group_id"]'
+                        )?.value;
+
+                        if (returnedId !== String(group.id)) {
+                            finish(new Error(
+                                "The embedded page returned a " +
+                                "different group."
+                            ));
+                            return;
+                        }
+
+                        const activeFilters = readVillageFiltersJSON(
+                            page,
+                            "initial_active_filters",
+                            true
+                        );
+
+                        if (
+                            !activeFilters ||
+                            typeof activeFilters !== "object" ||
+                            Array.isArray(activeFilters)
+                        ) {
+                            finish(new Error(
+                                "Unexpected saved-filter data format."
+                            ));
+                            return;
+                        }
+
+                        const expectedManualCount =
+                            Array.isArray(activeFilters.group_static)
+                                ? activeFilters.group_static.length
+                                : 0;
+
+                        const manualRules =
+                            readManualGroupFilters(form);
+
+                        if (
+                            manualRules.length < expectedManualCount
+                        ) {
+                            lastProblem =
+                                "The embedded page has not rendered " +
+                                "all active manual-group dropdowns.";
+                            return;
+                        }
+
+                        const hasSavedConditions = Object.values(
+                            activeFilters
+                        ).some(entries =>
+                            Array.isArray(entries) && entries.length > 0
+                        );
+
+                        const hasRenderedControls = Boolean(
+                            form.querySelector(
+                                'input[type="checkbox"][data-filter]'
+                            )
+                        );
+
+                        if (
+                            hasSavedConditions &&
+                            !hasRenderedControls
+                        ) {
+                            lastProblem =
+                                "The filter controls have not rendered.";
+                            return;
+                        }
+
+                        const definition = parseDefinition(
+                            page,
+                            group,
+                            activeFilters
+                        );
+
+                        finish(null, definition);
+                    } catch (error) {
+                        finish(new Error(
+                            "Could not read the initialized filter page: " +
+                            error.message
+                        ));
+                    }
+                }, 250);
+
+                frame.src = filterUrl(group).href;
+                document.body.appendChild(frame);
+            });
+        } finally {
+            clearInterval(timer);
+            frame.remove();
+        }
+    }
+
+    function appendDefinitionLink(container, group) {
+        const link = document.createElement("a");
+        link.href = filterUrl(group).href;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = "Open original filter definition »";
+
+        container.appendChild(link);
+    }
+
+    function showDefinition(container, definition, group) {
+        container.replaceChildren();
+
+        const heading = document.createElement("strong");
+        heading.textContent = "Dynamic group";
+
+        const logic = document.createElement("div");
+        logic.className = "p-logic";
+
+        logic.textContent = definition.custom
+            ? "Custom combinations enabled. Conditions below do not " +
+              "show their complete Boolean expression."
+            : "All active conditions must match, with the game's OR " +
+              "exceptions for listed continents, bonuses and flags.";
+
+        container.append(heading, logic);
+
+        if (definition.rules.length) {
+            const ul = document.createElement("ul");
+
+            for (const rule of definition.rules) {
+                const li = document.createElement("li");
+                li.textContent = `${rule.label}: ${rule.value}`;
+                ul.appendChild(li);
+            }
+
+            container.appendChild(ul);
+        } else {
+            const empty = document.createElement("div");
+            empty.textContent = "No active conditions were found.";
+            container.appendChild(empty);
+        }
+
+        appendDefinitionLink(container, group);
+    }
+
+    async function toggleDetails(group, details, button) {
+        if (busy) return;
+
+        details.hidden = !details.hidden;
+
+        button.textContent =
+            `${details.hidden ? "▶" : "▼"} ${group.name}`;
+
+        button.setAttribute(
+            "aria-expanded",
+            String(!details.hidden)
+        );
+
+        if (details.hidden) return;
+
+        if (cache.has(group.id)) {
+            showDefinition(details, cache.get(group.id), group);
+            return;
+        }
+
+        setBusy(true);
+
+        details.textContent =
+            "Loading initialized filter page...";
+
+        setStatus(
+            `Loading "${group.name}" in a temporary iframe...\n` +
+            "The reader does not submit filter changes."
+        );
+
+        try {
+            const definition =
+                await loadInitializedDefinition(group);
+
+            cache.set(group.id, definition);
+            showDefinition(details, definition, group);
+
+            setStatus(
+                `"${group.name}" filters loaded.\n` +
+                "Manual-group descriptions were read from the " +
+                "initialized dropdowns. The temporary iframe was removed."
+            );
+        } catch (error) {
+            details.replaceChildren();
+
+            const message = document.createElement("div");
+            message.textContent = error.message;
+
+            details.appendChild(message);
+            appendDefinitionLink(details, group);
+
+            setStatus(
+                "Could not load the definition. " +
+                "The temporary iframe was removed. " +
+                "No automatic retry was made.",
+                true
+            );
+
+            console.error("[Patika30 filters]", error);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    function updateCount() {
+        get("count").textContent =
+            `${groups.length} remaining · ${submitted} submitted`;
+    }
+
+    function showEmptyList() {
+        if (groups.length) return;
+
+        const message = document.createElement("div");
+        message.className = "p-empty";
+        message.textContent =
+            "No groups remaining in this popup.";
+
+        list.replaceChildren(message);
+    }
+
+    function applySearch() {
+        const query = search.value.trim().toLocaleLowerCase();
+
+        list.querySelectorAll(".p-row").forEach(row => {
+            row.hidden = !row.dataset.search.includes(query);
+        });
+    }
+
+    async function addGroup(group, row) {
+        if (busy || !mapForm) return;
+
+        setBusy(true);
+        setStatus(`Submitting "${group.name}"...`);
+
+        try {
+            const action = new URL(
+                mapForm.getAttribute("action"),
+                mapUrl.href
+            );
+
+            if (
+                action.origin !== location.origin ||
+                action.searchParams.get("action") !== "add_own_group"
+            ) {
+                throw new Error("Unexpected map form action.");
+            }
+
+            const body = new URLSearchParams();
+
+            mapForm.querySelectorAll(
+                'input[type="hidden"][name]'
+            ).forEach(input => {
+                if (!input.disabled) {
+                    body.append(input.name, input.value);
+                }
+            });
+
+            body.set("add_group", group.id);
+
+            const response = await fetch(action.href, {
+                method: "POST",
+                credentials: "same-origin",
+                body
+            });
+
+            const page = await readPage(response);
+            const updatedForm = findMapForm(page);
+
+            if (updatedForm) {
+                mapForm = updatedForm.cloneNode(true);
+            }
+
+            groups = groups.filter(item =>
+                item.id !== group.id
+            );
+
+            submitted++;
+
+            row.remove();
+            cache.delete(group.id);
+
+            updateCount();
+            showEmptyList();
+
+            setStatus(
+                `"${group.name}" submitted and removed from this popup.\n` +
+                "Persistence has not been independently verified. " +
+                "Click Refresh map to check the result."
+            );
+        } catch (error) {
+            setStatus(
+                `${error.message}\nNo automatic retry was made. ` +
+                "Refresh the map to check before retrying.",
+                true
+            );
+
+            console.error("[Patika30 add group]", error);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    function render() {
+        list.replaceChildren();
+
+        for (const group of groups) {
+            const row = document.createElement("div");
+            row.className = "p-row";
+            row.dataset.search =
+                group.name.toLocaleLowerCase();
+
+            const rowHeader = document.createElement("div");
+            rowHeader.className = "p-row-head";
+
+            const expand = document.createElement("button");
+            expand.className = "p-expand";
+            expand.type = "button";
+            expand.textContent = `▶ ${group.name}`;
+            expand.setAttribute("aria-expanded", "false");
+
+            const add = document.createElement("button");
+            add.className = "p-button p-add";
+            add.type = "button";
+            add.textContent = "Add";
+
+            const details = document.createElement("div");
+            details.className = "p-details";
+            details.hidden = true;
+
+            expand.addEventListener("click", () => {
+                void toggleDetails(group, details, expand);
+            });
+
+            add.addEventListener("click", () => {
+                void addGroup(group, row);
+            });
+
+            rowHeader.append(expand, add);
+            row.append(rowHeader, details);
+            list.appendChild(row);
+        }
+
+        applySearch();
+        updateCount();
+        showEmptyList();
+    }
+
+    search.addEventListener("input", applySearch);
+
+    get("refresh").addEventListener("click", () => {
+        if (busy) return;
+
+        setStatus("Reloading the map...");
+        get("refresh").disabled = true;
+
+        location.reload();
+    });
+
+    get("close").addEventListener("click", () => {
+        if (busy) {
+            setStatus(
+                "Wait for the current request to finish. " +
+                "Filter loading times out after 20 seconds."
+            );
+            return;
+        }
+
+        panel.remove();
+        style.remove();
+        cache.clear();
+
+        delete window[KEY];
+    });
+
+    const header = get("header");
+    let drag = null;
+
+    header.addEventListener("pointerdown", event => {
+        if (
+            event.button !== 0 ||
+            event.target.closest("button")
+        ) {
+            return;
+        }
+
+        const rect = panel.getBoundingClientRect();
+
+        drag = {
+            id: event.pointerId,
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top
+        };
+
+        panel.style.transform = "none";
+        panel.style.left = `${rect.left}px`;
+        panel.style.top = `${rect.top}px`;
+
+        header.setPointerCapture(event.pointerId);
+        event.preventDefault();
+    });
+
+    header.addEventListener("pointermove", event => {
+        if (!drag || drag.id !== event.pointerId) return;
+
+        const maxX = Math.max(
+            0,
+            innerWidth - panel.offsetWidth
+        );
+
+        const maxY = Math.max(
+            0,
+            innerHeight - panel.offsetHeight
+        );
+
+        panel.style.left =
+            Math.max(
+                0,
+                Math.min(maxX, event.clientX - drag.x)
+            ) + "px";
+
+        panel.style.top =
+            Math.max(
+                0,
+                Math.min(maxY, event.clientY - drag.y)
+            ) + "px";
+    });
+
+    for (const eventName of [
+        "pointerup",
+        "pointercancel",
+        "lostpointercapture"
+    ]) {
+        header.addEventListener(eventName, () => {
+            drag = null;
+        });
+    }
+
+    setBusy(true);
+    setStatus("Loading map group list...");
+
+    try {
+        let form = findMapForm(document);
+
+        if (!form) {
+            const response = await fetch(mapUrl.href, {
+                credentials: "same-origin",
+                cache: "no-store"
+            });
+
+            const page = await readPage(response);
+            form = findMapForm(page);
+        }
+
+        if (!form) {
+            throw new Error(
+                'Open "Add own group" on the map, ' +
+                "then close this popup and run the script again."
+            );
+        }
+
+        mapForm = form.cloneNode(true);
+
+        const select = mapForm.querySelector(
+            'select[name="add_group"]'
+        );
+
+        if (!select) {
+            throw new Error("Map group dropdown not found.");
+        }
+
+        const seen = new Set();
+
+        groups = Array.from(select.options)
+            .filter(option => {
+                if (
+                    !option.value ||
+                    option.disabled ||
+                    seen.has(option.value)
+                ) {
+                    return false;
+                }
+
+                seen.add(option.value);
+                return true;
+            })
+            .map(option => ({
+                id: option.value,
+                name: option.textContent.trim()
+            }));
+
+        render();
+
+        setStatus(
+            "Click a group name to read its initialized filters.\n" +
+            "Only Add submits a map-highlight change. " +
+            "Refresh map reloads the game page."
+        );
+    } catch (error) {
+        setStatus(error.message, true);
+        console.error("[Patika30 groups]", error);
+    } finally {
+        setBusy(false);
+    }
+})();
